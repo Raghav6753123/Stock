@@ -16,6 +16,15 @@ const database = process.env.DB_NAME ?? process.env.MYSQL_DATABASE ?? 'stonks';
 let pool;
 
 function getPool() {
+  console.info('MySQL connection configuration', {
+    host: host || null,
+    port: Number.isFinite(port) ? port : null,
+    user: user || null,
+    database,
+    passwordConfigured: Boolean(password),
+    passwordLength: typeof password === 'string' ? password.length : 0,
+  });
+
   if (!host || !user) {
     throw new Error(
       [
