@@ -13,29 +13,37 @@ const port = portRaw ? Number(portRaw) : undefined;
 
 const database = process.env.DB_NAME ?? process.env.MYSQL_DATABASE ?? 'stonks';
 
-if (!host || !user) {
-  throw new Error(
-    [
-      'MySQL is not configured. Missing required environment variables.',
-      'Set DB_HOST and DB_USER (or MYSQL_HOST and MYSQL_USER) in a .env.local at the project root.',
-      'Example keys: DB_HOST=127.0.0.1, DB_USER=stonks_app, DB_PASS=..., DB_NAME=stonks, DB_PORT=3306',
-    ].join('\n')
-  );
+let pool;
+
+function getPool() {
+  if (!host || !user) {
+    throw new Error(
+      [
+        'MySQL is not configured. Missing required environment variables.',
+        'Set DB_HOST and DB_USER (or MYSQL_HOST and MYSQL_USER) in the deployment environment.',
+        'Example keys: DB_HOST=127.0.0.1, DB_USER=stonks_app, DB_PASS=..., DB_NAME=stonks, DB_PORT=3306',
+      ].join('\n')
+    );
+  }
+
+  if (!pool) {
+    pool = mysql.createPool({
+      host,
+      user,
+      password,
+      port: Number.isFinite(port) ? port : undefined,
+      database,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+
+  return pool;
 }
 
-const pool = mysql.createPool({
-  host,
-  user,
-  password,
-  port: Number.isFinite(port) ? port : undefined,
-  database,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
-
 const getConnection = async (databaseOverride = database) => {
-  const connection = await pool.getConnection();
+  const connection = await getPool().getConnection();
   if (databaseOverride) {
     await connection.query(`USE \`${databaseOverride}\``);
   }
