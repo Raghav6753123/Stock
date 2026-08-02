@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -13,7 +15,7 @@ export async function POST(req: Request) {
     }
 
     // Forward the request to the Python ML microservice
-    const response = await fetch("http://127.0.0.1:8001/predict/eod", {
+    const response = await fetch(`${ML_SERVICE_URL}/predict/eod`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -16,14 +16,14 @@ import {
 
 loadServerEnvOnce();
 
-const GEMINI_MODEL = 'gemini-3-flash-preview';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const MAX_SESSION_MESSAGES = Number(process.env.AI_CHAT_SESSION_MESSAGE_LIMIT || 40);
 const STOCKS_FETCH_TIMEOUT_MS = Number(process.env.AI_STOCKS_FETCH_TIMEOUT_MS || 12000);
 const NEWS_FETCH_TIMEOUT_MS = Number(process.env.AI_NEWS_FETCH_TIMEOUT_MS || 12000);
 const CHROMA_TIMEOUT_MS = 1500; // Force fast timeout so it doesn't hang if Chroma is down
 const AI_INFER_TIMEOUT_MS = Number(process.env.AI_INFER_TIMEOUT_MS || 60000);
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8001';
-const CHAT_MODEL_PROVIDER = 'gemini';
+const CHAT_MODEL_PROVIDER = process.env.CHAT_MODEL_PROVIDER || 'gemini';
 const CHAT_MODEL_ENABLE_FALLBACK = process.env.CHAT_MODEL_ENABLE_FALLBACK === 'true';
 
 const HF_STOCK_MODEL_ENABLED = process.env.HF_STOCK_MODEL_ENABLED === 'true';
