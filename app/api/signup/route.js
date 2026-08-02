@@ -95,6 +95,7 @@ export async function POST(req) {
       conn.release();
     }
   } catch (error) {
+    console.error('Signup failed:', error);
     const message = process.env.NODE_ENV === 'production'
       ? 'Signup failed'
       : (error instanceof Error ? error.message : 'Signup failed');
