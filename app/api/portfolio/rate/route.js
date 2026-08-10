@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { z } from 'zod';
 import getConnection from '../../lib/mysql';
-import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from '../../lib/jwt';
+import jwtUtil from '../../lib/jwt';
 import { getGeminiApiKey, upsertPortfolioSnapshotToChroma, ensureAiEnv } from '../../lib/chromaMemory';
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
@@ -25,10 +25,10 @@ function round2(v) {
 }
 
 async function getAuthenticatedUserId(req) {
-  const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const accessToken = req.cookies.get(jwtUtil.ACCESS_TOKEN_COOKIE)?.value;
   if (!accessToken) return null;
   try {
-    const decoded = await verifyAccessToken(accessToken);
+    const decoded = await jwtUtil.verifyAccessToken(accessToken);
     return decoded?.sub ? String(decoded.sub) : null;
   } catch {
     return null;

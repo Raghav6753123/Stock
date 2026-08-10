@@ -3,13 +3,7 @@ import bcrypt from 'bcryptjs';
 import getConnection from '../lib/mysql';
 import { buildAuthCookies } from '../lib/authCookies';
 import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
-import {
-  createRefreshTokenId,
-  hashToken,
-  signAccessToken,
-  signRefreshToken,
-  REFRESH_TOKEN_TTL_SECONDS_DEFAULT,
-} from '../lib/jwt';
+import jwtUtil from '../lib/jwt';
 
 export async function POST(req) {
   try {
@@ -72,19 +66,19 @@ export async function POST(req) {
         return NextResponse.json({ error: 'User creation failed' }, { status: 500 });
       }
 
-      const refreshTokenId = createRefreshTokenId();
-      const accessToken = await signAccessToken({ sub: user.id, email: user.email, name: user.name });
-      const refreshToken = await signRefreshToken({ sub: user.id, jti: refreshTokenId }, REFRESH_TOKEN_TTL_SECONDS_DEFAULT);
-      const refreshTokenHash = hashToken(refreshToken);
+      const refreshTokenId = jwtUtil.createRefreshTokenId();
+      const accessToken = await jwtUtil.signAccessToken({ sub: user.id, email: user.email, name: user.name });
+      const refreshToken = await jwtUtil.signRefreshToken({ sub: user.id, jti: refreshTokenId }, jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT);
+      const refreshTokenHash = jwtUtil.hashToken(refreshToken);
 
       await conn.query(
         'UPDATE users SET refresh_token_hash = ?, refresh_token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND) WHERE id = ?',
-        [refreshTokenHash, REFRESH_TOKEN_TTL_SECONDS_DEFAULT, user.id]
+        [refreshTokenHash, jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT, user.id]
       );
       const cookies = buildAuthCookies({
         accessToken,
         refreshToken,
-        refreshMaxAgeSeconds: REFRESH_TOKEN_TTL_SECONDS_DEFAULT,
+        refreshMaxAgeSeconds: jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT,
       });
 
       const res = NextResponse.json({ user }, { status: 201 });

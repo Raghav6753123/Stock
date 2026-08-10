@@ -3,14 +3,7 @@ import bcrypt from 'bcryptjs';
 import getConnection from '../lib/mysql';
 import { buildAuthCookies } from '../lib/authCookies';
 import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
-import {
-    createRefreshTokenId,
-    hashToken,
-    signAccessToken,
-    signRefreshToken,
-    REFRESH_TOKEN_TTL_SECONDS_DEFAULT,
-    REFRESH_TOKEN_TTL_SECONDS_REMEMBER_ME,
-} from '../lib/jwt';
+import jwtUtil from '../lib/jwt';
 
 export async function POST(req) {
     try {
@@ -22,7 +15,6 @@ export async function POST(req) {
         if (!email || !password) {
             return NextResponse.json({ error: 'Missing email or password' }, { status: 400 });
         }
-
         if (email.length > 254 || password.length > 256) {
             return NextResponse.json({ error: 'Invalid input length' }, { status: 400 });
         }
@@ -72,14 +64,14 @@ export async function POST(req) {
             }
 
             const refreshTtl = rememberMe
-                ? REFRESH_TOKEN_TTL_SECONDS_REMEMBER_ME
-                : REFRESH_TOKEN_TTL_SECONDS_DEFAULT;
+                ? jwtUtil.REFRESH_TOKEN_TTL_SECONDS_REMEMBER_ME
+                : jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT;
 
-            const refreshTokenId = createRefreshTokenId();
+            const refreshTokenId = jwtUtil.createRefreshTokenId();
 
-            const accessToken = await signAccessToken({ sub: user.id, email: user.email, name: user.name });
-            const refreshToken = await signRefreshToken({ sub: user.id, jti: refreshTokenId }, refreshTtl);
-            const refreshTokenHash = hashToken(refreshToken);
+            const accessToken = await jwtUtil.signAccessToken({ sub: user.id, email: user.email, name: user.name });
+            const refreshToken = await jwtUtil.signRefreshToken({ sub: user.id, jti: refreshTokenId }, refreshTtl);
+            const refreshTokenHash = jwtUtil.hashToken(refreshToken);
 
             await conn.query(
                 'UPDATE users SET refresh_token_hash = ?, refresh_token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND) WHERE id = ?',

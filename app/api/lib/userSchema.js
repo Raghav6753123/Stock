@@ -24,7 +24,6 @@ export async function ensureUsersTable(conn) {
         "Database schema missing 'users' table. Create it manually, or set AUTO_MIGRATE_AUTH=1 to let the API create it automatically.",
     };
   }
-
   try {
     await conn.query(`
       CREATE TABLE users (

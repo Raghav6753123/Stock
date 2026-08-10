@@ -18,6 +18,11 @@ Required groups:
 Recommended for Vercel:
 - `NEWS_FINBERT_ENABLED=0`
 - `NEWS_FINBERT_ON_VERCEL=0`
+- `HF_TOKEN` with Hugging Face inference permission. This powers BGE semantic embeddings used by Chroma memory retrieval.
+
+### Vector search
+
+Chat memory, stock context, and news context use the full 384-dimensional output from `BAAI/bge-small-en-v1.5`, normalized and queried in Chroma using cosine nearest-neighbour retrieval (HNSW when Chroma is running). Configure `HF_TOKEN` and optionally `BGE_EMBEDDING_URL` if you run a compatible embedding endpoint yourself. The collection names are versioned with `_bge_v2`; old 64-dimensional local vectors and the earlier 192-dimensional experimental vectors are intentionally not reused.
 
 ## 3) Push and Import to Vercel
 1. Push your repository to GitHub/GitLab/Bitbucket.

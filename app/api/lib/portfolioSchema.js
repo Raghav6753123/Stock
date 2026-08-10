@@ -61,6 +61,18 @@ export async function ensurePortfolioHoldingsTable(conn) {
 export async function ensurePortfolioTransactionsTable(conn) {
   const [tableRows] = await conn.query("SHOW TABLES LIKE 'portfolio_transactions'");
   if (tableRows && tableRows.length > 0) {
+    if (autoMigrateEnabled()) {
+      try {
+        await conn.query(`
+          ALTER TABLE portfolio_transactions 
+          ADD COLUMN idempotency_key VARCHAR(100) NULL,
+          ADD COLUMN completed_response JSON NULL,
+          ADD UNIQUE KEY uq_portfolio_txn_idemp (user_id, idempotency_key)
+        `);
+      } catch (e) {
+        // Ignore if already added
+      }
+    }
     return { ok: true, migrated: false };
   }
 
@@ -85,8 +97,11 @@ export async function ensurePortfolioTransactionsTable(conn) {
         price DECIMAL(14, 2) NOT NULL,
         total_value DECIMAL(16, 2) NOT NULL,
         realized_pnl DECIMAL(16, 2) NOT NULL DEFAULT 0.00,
+        idempotency_key VARCHAR(100) NULL,
+        completed_response JSON NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
+        UNIQUE KEY uq_portfolio_txn_idemp (user_id, idempotency_key),
         KEY idx_portfolio_txn_user_created (user_id, created_at),
         CONSTRAINT fk_portfolio_txn_user FOREIGN KEY (user_id)
           REFERENCES users (id)

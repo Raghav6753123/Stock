@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import getConnection from '../lib/mysql';
-import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from '../lib/jwt';
+import jwtUtil from '../lib/jwt';
 import { ensureWalletRow, ensureWalletTable } from '../lib/walletSchema';
 
 async function getAuthenticatedUserId(req) {
-  const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const accessToken = req.cookies.get(jwtUtil.ACCESS_TOKEN_COOKIE)?.value;
   if (!accessToken) return null;
 
   try {
-    const decoded = await verifyAccessToken(accessToken);
+    const decoded = await jwtUtil.verifyAccessToken(accessToken);
     return decoded?.sub ? String(decoded.sub) : null;
   } catch {
     return null;

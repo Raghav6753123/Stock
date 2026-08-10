@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import getConnection from '../lib/mysql';
-import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from '../lib/jwt';
+import jwtUtil from '../lib/jwt';
 import { ensureWalletRow, ensureWalletTable } from '../lib/walletSchema';
 import {
   ensurePortfolioHoldingsTable,
@@ -16,10 +16,10 @@ function roundQty(value) {
 }
 
 async function getAuthenticatedUserId(req) {
-  const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const accessToken = req.cookies.get(jwtUtil.ACCESS_TOKEN_COOKIE)?.value;
   if (!accessToken) return null;
   try {
-    const decoded = await verifyAccessToken(accessToken);
+    const decoded = await jwtUtil.verifyAccessToken(accessToken);
     return decoded?.sub ? String(decoded.sub) : null;
   } catch {
     return null;
@@ -168,6 +168,8 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Trade value exceeds per-transaction limit' }, { status: 400 });
     }
 
+    const idempotencyKey = req.headers.get('x-idempotency-key') || null;
+
     const conn = await getConnection();
     try {
       const schema = await ensurePortfolioSchema(conn);
@@ -179,6 +181,19 @@ export async function POST(req) {
       await conn.beginTransaction();
 
       try {
+        if (idempotencyKey) {
+          const [existingTxn] = await conn.query(
+            'SELECT completed_response FROM portfolio_transactions WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+            [userId, idempotencyKey]
+          );
+          if (existingTxn && existingTxn.length > 0 && existingTxn[0].completed_response) {
+            await conn.rollback();
+            const payload = typeof existingTxn[0].completed_response === 'string' 
+              ? JSON.parse(existingTxn[0].completed_response) 
+              : existingTxn[0].completed_response;
+            return NextResponse.json(payload, { status: 200 });
+          }
+        }
         const [walletRows] = await conn.query(
           'SELECT id, balance FROM wallets WHERE user_id = ? LIMIT 1 FOR UPDATE',
           [userId]
@@ -264,31 +279,30 @@ export async function POST(req) {
           [nextWallet, userId]
         );
 
+        const responsePayload = {
+          ok: true,
+          trade: {
+            sym,
+            name,
+            side,
+            quantity,
+            price,
+            totalValue,
+            realizedPnl,
+          },
+          walletBalance: nextWallet,
+        };
+
         await conn.query(
           `INSERT INTO portfolio_transactions
-           (user_id, sym, name, side, quantity, price, total_value, realized_pnl)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [userId, sym, name, side, quantity, price, totalValue, realizedPnl]
+           (user_id, sym, name, side, quantity, price, total_value, realized_pnl, idempotency_key, completed_response)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, sym, name, side, quantity, price, totalValue, realizedPnl, idempotencyKey, JSON.stringify(responsePayload)]
         );
 
         await conn.commit();
 
-        return NextResponse.json(
-          {
-            ok: true,
-            trade: {
-              sym,
-              name,
-              side,
-              quantity,
-              price,
-              totalValue,
-              realizedPnl,
-            },
-            walletBalance: nextWallet,
-          },
-          { status: 200 }
-        );
+        return NextResponse.json(responsePayload, { status: 200 });
       } catch (e) {
         await conn.rollback();
         throw e;

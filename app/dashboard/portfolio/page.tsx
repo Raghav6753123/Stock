@@ -111,6 +111,7 @@ export default function PortfolioPage() {
   const [selectedSym, setSelectedSym] = useState('');
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
   const [quantity, setQuantity] = useState('');
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -237,7 +238,10 @@ export default function PortfolioPage() {
     try {
       const res = await fetch('/api/portfolio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-idempotency-key': idempotencyKey
+        },
         body: JSON.stringify({
           side,
           sym: selectedStock.sym,
@@ -254,6 +258,7 @@ export default function PortfolioPage() {
 
       setSuccess(`${side === 'BUY' ? 'Bought' : 'Sold'} ${q} ${selectedStock.sym}`);
       setQuantity('');
+      setIdempotencyKey(crypto.randomUUID());
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Trade failed');

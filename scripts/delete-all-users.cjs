@@ -3,59 +3,20 @@ const path = require('path');
 const dotenv = require('dotenv');
 const mysql = require('mysql2/promise');
 
-function parseLooseEnvFile(contents) {
-  const out = {};
-  const lines = contents.split(/\r?\n/);
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-
-    const equalsIndex = line.indexOf('=');
-    if (equalsIndex <= 0) continue;
-
-    let key = line.slice(0, equalsIndex).trim();
-    let value = line.slice(equalsIndex + 1).trim();
-
-    if (key.startsWith('export ')) {
-      key = key.slice('export '.length).trim();
-    }
-
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    out[key] = value;
-  }
-
-  return out;
-}
-
-function tryLoad(dotenvPath) {
-  if (!fs.existsSync(dotenvPath)) return;
-  dotenv.config({ path: dotenvPath, override: false });
-
-  const loose = parseLooseEnvFile(fs.readFileSync(dotenvPath, 'utf8'));
-  for (const [k, v] of Object.entries(loose)) {
-    if (process.env[k] === undefined) process.env[k] = v;
-  }
-}
-
 function loadEnv() {
   const cwd = process.cwd();
-  const candidates = [
-    path.join(cwd, '.env.local'),
-    path.join(cwd, '.env'),
-    path.join(cwd, 'app', 'api', '.env.local'),
-    path.join(cwd, 'app', 'api', '.env'),
-  ];
+  const projectRoot = path.resolve(__dirname, '..');
+  const baseDirs = [cwd, projectRoot];
+  const candidates = [];
 
-  for (const candidate of candidates) {
-    tryLoad(candidate);
+  for (const baseDir of baseDirs) {
+    candidates.push(path.join(baseDir, '.env.local'));
+    candidates.push(path.join(baseDir, '.env'));
+    candidates.push(path.join(baseDir, 'app', 'api', '.env.local'));
+    candidates.push(path.join(baseDir, 'app', 'api', '.env'));
   }
+
+  dotenv.config({ path: candidates });
 }
 
 function getDbConfig() {

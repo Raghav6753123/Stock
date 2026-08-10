@@ -1,49 +1,24 @@
-import {
-  ACCESS_TOKEN_COOKIE,
-  REFRESH_TOKEN_COOKIE,
-  ACCESS_TOKEN_TTL_SECONDS,
-} from './jwt';
+import jwtUtil from './jwt';
+
+const getCommon = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/',
+});
 
 export function buildAuthCookies({ accessToken, refreshToken, refreshMaxAgeSeconds }) {
-  const secure = process.env.NODE_ENV === 'production';
-
-  const common = {
-    httpOnly: true,
-    secure,
-    sameSite: 'lax',
-    path: '/',
+  const common = getCommon();
+  return {
+    access: { name: jwtUtil.ACCESS_TOKEN_COOKIE, value: accessToken, maxAge: jwtUtil.ACCESS_TOKEN_TTL_SECONDS, ...common },
+    refresh: { name: jwtUtil.REFRESH_TOKEN_COOKIE, value: refreshToken, maxAge: refreshMaxAgeSeconds, ...common },
   };
-
-  const access = {
-    name: ACCESS_TOKEN_COOKIE,
-    value: accessToken,
-    ...common,
-    maxAge: ACCESS_TOKEN_TTL_SECONDS,
-  };
-
-  const refresh = {
-    name: REFRESH_TOKEN_COOKIE,
-    value: refreshToken,
-    ...common,
-    maxAge: refreshMaxAgeSeconds,
-  };
-
-  return { access, refresh };
 }
 
 export function clearAuthCookies() {
-  const secure = process.env.NODE_ENV === 'production';
-
-  const common = {
-    httpOnly: true,
-    secure,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  };
-
+  const common = getCommon();
   return {
-    access: { name: ACCESS_TOKEN_COOKIE, value: '', ...common },
-    refresh: { name: REFRESH_TOKEN_COOKIE, value: '', ...common },
+    access: { name: jwtUtil.ACCESS_TOKEN_COOKIE, value: '', maxAge: 0, ...common },
+    refresh: { name: jwtUtil.REFRESH_TOKEN_COOKIE, value: '', maxAge: 0, ...common },
   };
 }
