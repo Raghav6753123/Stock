@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { io } from 'socket.io-client';
 import AuthRefresh from '@/components/auth-refresh';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   TrendingUp, Search, Bell, Settings, LogOut, Menu, Home, User,
-  BarChart3, Newspaper, Wallet, Brain, PieChart, Receipt,
-  ArrowUpRight, ArrowDownRight,
+  BarChart3, Newspaper, Wallet, Brain, Receipt, Scale,
+  ArrowUpRight, ArrowDownRight, Eye,
 } from 'lucide-react';
 
 /* ── constants ─────────────────────────────────────────────────────────── */
@@ -34,11 +35,13 @@ const SEED_INDICES: IndexItem[] = [
 const NAV = [
   { icon: Home, label: 'Dashboard', href: '/dashboard' },
   { icon: BarChart3, label: 'Stocks', href: '/dashboard/stocks' },
+  { icon: Scale, label: 'Compare', href: '/dashboard/compare' },
   { icon: Newspaper, label: 'News', href: '/dashboard/news' },
+  { icon: Bell, label: 'Alerts', href: '/dashboard/alerts' },
+  { icon: Eye, label: 'Observations', href: '/dashboard/observations' },
   { icon: Brain, label: 'AI Chat', href: '/dashboard/ai' },
   { icon: Wallet, label: 'Portfolio', href: '/dashboard/portfolio' },
   { icon: Receipt, label: 'Transactions', href: '/dashboard/transactions' },
-  { icon: PieChart, label: 'Portfolio Rater', href: '/dashboard/portfolio-rater' },
 ];
 
 /* ── layout ────────────────────────────────────────────────────────────── */
@@ -48,6 +51,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [indices, setIndices] = useState<IndexItem[]>(SEED_INDICES);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [newAlert, setNewAlert] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   /* fetch live indices for the ticker */
@@ -65,6 +69,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     pull();
     const iv = setInterval(pull, BACKEND_POLL_MS);
     return () => { alive = false; clearInterval(iv); };
+  }, []);
+
+  useEffect(() => {
+    const socket = io();
+    socket.emit('alerts:watch');
+    socket.on('alerts:update', (data) => {
+      if (!data?.triggered?.length) return;
+      setNewAlert(true);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        data.triggered.forEach((alert: { symbol: string; price: number; target: number }) => {
+          new Notification(`${alert.symbol} price alert`, { body: `Current price: $${alert.price.toFixed(2)} (target $${alert.target.toFixed(2)})` });
+        });
+      }
+    });
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   /* bluff micro-movements for the ticker */
@@ -200,10 +221,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
 
           {/* bell */}
-          <button className="relative p-2 rounded-xl bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
+          <Link href="/dashboard/alerts" onClick={() => setNewAlert(false)} className="relative p-2 rounded-xl bg-muted border border-border text-muted-foreground hover:text-foreground transition-all">
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
-          </button>
+            {newAlert && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />}
+          </Link>
 
           {/* avatar dropdown */}
           <div ref={profileMenuRef} className="relative">

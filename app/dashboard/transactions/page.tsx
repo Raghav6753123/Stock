@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, ArrowDownRight, Search, RefreshCw, Receipt } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Search, RefreshCw, Receipt, Download } from 'lucide-react';
 
 type Txn = {
   id: number;
@@ -41,6 +41,12 @@ function fmtDate(v: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function csvValue(value: string | number) {
+  const text = String(value ?? '');
+  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
 }
 
 export default function TransactionsPage() {
@@ -86,6 +92,32 @@ export default function TransactionsPage() {
     });
   }, [transactions, searchQuery, filterSide]);
 
+  const exportTransactions = () => {
+    const rows = [
+      ['Date', 'Symbol', 'Name', 'Side', 'Quantity', 'Price', 'Total Value', 'Realized P&L'],
+      ...filteredTransactions.map((transaction) => [
+        new Date(transaction.createdAt).toISOString(),
+        transaction.sym,
+        transaction.name,
+        transaction.side,
+        transaction.quantity,
+        transaction.price,
+        transaction.totalValue,
+        transaction.realizedPnl,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(csvValue).join(',')).join('\n');
+    const file = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(file);
+    link.href = url;
+    link.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -99,14 +131,24 @@ export default function TransactionsPage() {
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">View and filter your complete trading history.</p>
         </div>
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2 transition-all shadow-sm"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportTransactions}
+            disabled={filteredTransactions.length === 0}
+            className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2 transition-all shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2 transition-all shadow-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30 p-3 rounded-xl">{error}</p>}

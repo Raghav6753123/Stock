@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import getConnection from '../../lib/mysql';
 import { buildAuthCookies } from '../../lib/authCookies';
 import jwtUtil from '../../lib/jwt';
+import { isTrustedOrigin } from '../../lib/requestSecurity';
 
 export async function POST(req) {
   try {
+    if (!isTrustedOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
     const refreshToken = req.cookies.get(jwtUtil.REFRESH_TOKEN_COOKIE)?.value;
     if (!refreshToken) {
       return NextResponse.json({ error: 'Missing refresh token' }, { status: 401 });

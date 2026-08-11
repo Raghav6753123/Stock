@@ -3,7 +3,15 @@
 ## 1) Prerequisites
 - A Vercel account connected to your Git provider.
 - A production MySQL database reachable from Vercel.
-- API keys for Firebase, News API, Finnhub, Twelve Data, and Gemini.
+- API keys for News API, Finnhub, Twelve Data, and Gemini.
+
+## Local start
+
+1. Review `.env` and add your MySQL credentials. The checked-in development defaults expect MySQL at `127.0.0.1:3306` with a `stonks` database.
+2. Add provider keys to enable live news, price history, and AI chat.
+3. Run `npm.cmd run dev`, then open `http://localhost:3000`.
+
+`AUTO_MIGRATE_DB=1` and `AUTO_MIGRATE_AUTH=1` are enabled only in the local `.env` so the application tables are created automatically on first use. Set both back to `0` for production after migrating the database.
 
 ## 2) Prepare Environment Variables
 Use `.env.example` as the source of truth and add these in Vercel Project Settings > Environment Variables.
@@ -11,14 +19,9 @@ Use `.env.example` as the source of truth and add these in Vercel Project Settin
 Required groups:
 - Database: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME`
 - Auth: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
-- Firebase client: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- Firebase admin: `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`
 - Providers: `GEMINI_API_KEY`, `NEWS_API_KEY`, `FINNHUB_API_KEY`, `TWELVE_DATA_API_KEY`
 
-Recommended for Vercel:
-- `NEWS_FINBERT_ENABLED=0`
-- `NEWS_FINBERT_ON_VERCEL=0`
-- `HF_TOKEN` with Hugging Face inference permission. This powers BGE semantic embeddings used by Chroma memory retrieval.
+Recommended for Vercel: `HF_TOKEN` with Hugging Face inference permission. This powers BGE semantic embeddings used by Chroma memory retrieval.
 
 ### Vector search
 
@@ -40,16 +43,7 @@ Chat memory, stock context, and news context use the full 384-dimensional output
   - `/api/market/stocks`
   - `/api/news/realtime`
 
-## 5) Notes About Python-Based Features
-Vercel serverless functions do not reliably support this app's local Python child-process flow. The app is prepared to degrade gracefully:
-- `/api/market/predict` falls back to an in-process heuristic predictor on Vercel.
-- FinBERT enrichment in news is skipped by default on Vercel unless explicitly enabled.
-
-If you need full Python model inference in production, run a separate Python service and set:
-- `PY_AI_SERVICE_URL`
-- `PY_AI_SERVICE_TIMEOUT_MS`
-
-## 6) Optional Vercel CLI Flow
+## 5) Optional Vercel CLI Flow
 ```bash
 pnpm install
 pnpm build
@@ -57,35 +51,8 @@ npx vercel
 npx vercel --prod
 ```
 
-## 7) Troubleshooting
-- 500 on auth routes: verify JWT and Firebase admin variables.
+## 6) Troubleshooting
+- 500 on auth routes: verify the JWT and database variables.
 - DB connection errors: verify host/port/user/password and DB network access.
 - Empty market/news data: verify provider keys and daily limits.
 
-## 8) Running the Local ML Service
-
-This project includes a Python FastAPI microservice for end-of-day stock predictions (`/predict/eod`), keeping heavy ML dependencies separate from Node.js.
-
-### Setup
-1. Open a terminal and navigate to the `ml_service` folder.
-2. (Optional) Create a virtual environment: `python -m venv venv` and activate it (e.g. `venv\Scripts\activate`).
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Running
-Start the Python service on port 8001:
-```bash
-cd ml_service
-uvicorn app.main:app --port 8001 --reload
-```
-Next.js API routes (like `/api/predict/eod`) are configured to automatically forward requests to `http://127.0.0.1:8001`.
-
-### Testing
-Once both Next.js (`npm run dev`) and the ML service are running, you can test the prediction API:
-```bash
-curl -X POST http://localhost:3000/api/predict/eod \
-  -H "Content-Type: application/json" \
-  -d "{\"ticker\":\"AAPL\"}"
-```

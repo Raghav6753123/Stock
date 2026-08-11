@@ -1,12 +1,8 @@
 import { loadServerEnvOnce } from './loadEnv';
-import path from 'path';
-import { spawn } from 'child_process';
 
 loadServerEnvOnce();
 
 const API_BASE = 'https://newsapi.org/v2';
-const FINBERT_TIMEOUT_MS = Number(process.env.FINBERT_TIMEOUT_MS || 25000);
-const IS_VERCEL = process.env.VERCEL === '1';
 
 function getApiKey() {
   const key = process.env.NEWS_API_KEY;
@@ -76,92 +72,6 @@ function normalizeArticles(articles = [], maxItems = 8) {
     });
 }
 
-async function runFinBert(textItems) {
-  if (!Array.isArray(textItems) || textItems.length === 0) return [];
-
-  const pythonBin = process.env.PYTHON_BIN || 'python';
-  const scriptPath = path.join(process.cwd(), 'scripts', 'finbert_sentiment.py');
-  const payload = JSON.stringify(textItems);
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(pythonBin, [scriptPath, payload], {
-      cwd: process.cwd(),
-      env: { ...process.env },
-      windowsHide: true,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    const timeout = setTimeout(() => {
-      child.kill();
-      reject(new Error('FinBERT timed out'));
-    }, FINBERT_TIMEOUT_MS);
-
-    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-
-    child.on('error', err => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-
-    child.on('close', code => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        reject(new Error(stderr.trim() || stdout.trim() || `FinBERT failed with code ${code}`));
-        return;
-      }
-      try {
-        const parsed = JSON.parse(stdout.trim());
-        resolve(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        reject(new Error('Invalid JSON from FinBERT script'));
-      }
-    });
-  });
-}
-
-function mapFinBertLabelToSentiment(label) {
-  const v = String(label || '').toLowerCase();
-  if (v.includes('positive')) return 'bullish';
-  if (v.includes('negative')) return 'bearish';
-  return 'neutral';
-}
-
-async function enrichNewsWithFinBert(items) {
-  const enabled = String(process.env.NEWS_FINBERT_ENABLED || '1').toLowerCase();
-  if (enabled === '0' || enabled === 'false' || enabled === 'no') return items;
-  if (IS_VERCEL && process.env.NEWS_FINBERT_ON_VERCEL !== '1') return items;
-
-  const textItems = items.map(item => ({
-    headline: item.headline,
-    description: item.description || '',
-  }));
-
-  try {
-    const finbert = await runFinBert(textItems);
-    if (!Array.isArray(finbert) || finbert.length === 0) return items;
-
-    return items.map((item, idx) => {
-      const row = finbert[idx];
-      if (!row || typeof row !== 'object') return item;
-
-      const mappedSentiment = mapFinBertLabelToSentiment(row.label);
-      const conf = Number(row.confidence);
-      const confText = Number.isFinite(conf) ? ` (${(conf * 100).toFixed(1)}% confidence)` : '';
-      
-      return {
-        ...item,
-        sentiment: mappedSentiment || item.sentiment,
-        sentimentReview: row.review ? String(row.review) : `FinBERT sentiment: ${mappedSentiment}${confText}.`,
-      };
-    });
-  } catch {
-    return items;
-  }
-}
-
 export async function getMarketNews(options = {}) {
   const q = options.query || 'stock market OR nifty OR sensex OR nasdaq';
   const pageSize = options.pageSize ?? 10;
@@ -191,7 +101,5 @@ export async function getMarketNews(options = {}) {
   }
 
   const normalized = normalizeArticles(payload?.articles || [], maxArticles);
-  const enriched = await enrichNewsWithFinBert(normalized);
-
-  return { items: enriched };
+  return { items: normalized };
 }

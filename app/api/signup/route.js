@@ -4,9 +4,11 @@ import getConnection from '../lib/mysql';
 import { buildAuthCookies } from '../lib/authCookies';
 import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
 import jwtUtil from '../lib/jwt';
+import { isTrustedOrigin } from '../lib/requestSecurity';
 
 export async function POST(req) {
   try {
+    if (!isTrustedOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
     const body = await req.json().catch(() => ({}));
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';

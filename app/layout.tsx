@@ -10,7 +10,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Stonks — AI-Powered Stock Dashboard',
-  description: 'Real-time stock analysis, AI predictions, and portfolio management',
+  description: 'Real-time stock analysis and portfolio management',
   generator: 'v0.app',
   icons: {
     icon: [

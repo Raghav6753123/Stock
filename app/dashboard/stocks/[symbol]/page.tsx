@@ -19,7 +19,6 @@ import {
   ArrowDownRight,
   Activity,
   CalendarRange,
-  BrainCircuit,
   Wallet,
   RefreshCw,
   ShoppingCart,
@@ -81,15 +80,6 @@ type PortfolioResponse = {
   walletBalance: number;
   holdings: Holding[];
   transactions: Txn[];
-};
-
-type BuySignalResponse = {
-  ticker: string;
-  current_price: number;
-  predicted_price_5d: number;
-  predicted_return_percent: number;
-  signal: 'BUY' | 'DO NOT BUY';
-  disclaimer: string;
 };
 
 function seededRandom(seed: number) {
@@ -242,8 +232,6 @@ export default function StockDetailsPage() {
   const [stock, setStock] = useState<Stock | null>(null);
   const [minuteData, setMinuteData] = useState<MinutePoint[]>([]);
   const [dailyData, setDailyData] = useState<DailyPoint[]>([]);
-  const [modelPredictedPrice, setModelPredictedPrice] = useState<number | null>(null);
-  const [buySignalResult, setBuySignalResult] = useState<BuySignalResponse | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
   const [tradeSide, setTradeSide] = useState<'BUY' | 'SELL'>('BUY');
   const [tradeQty, setTradeQty] = useState('');
@@ -373,71 +361,6 @@ export default function StockDetailsPage() {
     return stock?.price ?? 0;
   }, [minuteData, stock?.price]);
 
-  useEffect(() => {
-    let alive = true;
-
-    const runPrediction = async () => {
-      try {
-        const res = await fetch('/api/predict/eod', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticker: routeSymbol }),
-          cache: 'no-store',
-        });
-        const json = await res.json();
-
-        if (!alive) return;
-        if (res.ok && Number.isFinite(Number(json?.predicted_close))) {
-          setModelPredictedPrice(Number(json.predicted_close));
-        } else {
-          setModelPredictedPrice(null);
-        }
-      } catch {
-        if (!alive) return;
-        setModelPredictedPrice(null);
-      }
-    };
-
-    runPrediction();
-
-    const fetchBuySignal = async () => {
-      try {
-        const res = await fetch('/api/predict-buy-signal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticker: routeSymbol }),
-          cache: 'no-store',
-        });
-        const json = await res.json();
-
-        if (!alive) return;
-        if (res.ok && json?.signal) {
-          setBuySignalResult(json);
-        } else {
-          setBuySignalResult(null);
-        }
-      } catch {
-        if (!alive) return;
-        setBuySignalResult(null);
-      }
-    };
-    
-    if (routeSymbol === 'AAPL' || routeSymbol === 'TSLA') {
-      fetchBuySignal();
-    }
-
-    return () => {
-      alive = false;
-    };
-  }, [routeSymbol]);
-
-  const predictedPrice = useMemo(() => {
-    if (Number.isFinite(modelPredictedPrice)) return round2(Number(modelPredictedPrice));
-    const seed = symbolSeed(routeSymbol || 'STOCK') % 1000;
-    const bump = ((seed % 28) - 7) / 1000;
-    return round2(todayPrice * (1 + bump));
-  }, [modelPredictedPrice, routeSymbol, todayPrice]);
-
   const dailyCandles = useMemo(() => {
     if (dailyData.length > 0) {
       return dailyData.map((p, idx) => {
@@ -486,9 +409,6 @@ export default function StockDetailsPage() {
     }
     return intraday.changePct;
   }, [stock?.chg, intraday.changePct]);
-
-  const predictionDelta = predictedPrice - todayPrice;
-  const predictionUp = predictionDelta >= 0;
 
   const currentHolding = useMemo(() => {
     return (portfolio?.holdings || []).find((h) => h.sym.toUpperCase() === routeSymbol) || null;
@@ -676,50 +596,6 @@ export default function StockDetailsPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            </div>
-
-            {/* AI Predictions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">EOD Price Predictor</p>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#38bdf8]/10 text-[#38bdf8] border border-[#38bdf8]/20">
-                    {modelPredictedPrice !== null ? 'LSTM' : 'Heuristic'}
-                  </span>
-                </div>
-                <p className="text-3xl font-black text-white tracking-tight">{formatPrice(stock.sym, predictedPrice)}</p>
-                <p className={`text-sm mt-2 font-semibold ${predictionUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {predictionUp ? '+' : '-'}{formatPrice(stock.sym, Math.abs(predictionDelta))} vs current
-                </p>
-              </div>
-
-              {buySignalResult ? (
-                <div className="rounded-2xl border border-[#8b5cf6]/30 bg-[#8b5cf6]/5 p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">RF Buy Signal (5-Day)</p>
-                    <BrainCircuit className="w-4 h-4 text-[#8b5cf6]" />
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className={`text-3xl font-black tracking-tight ${buySignalResult.signal === 'BUY' ? 'text-emerald-400' : 'text-orange-400'}`}>
-                        {buySignalResult.signal}
-                      </p>
-                      <p className={`text-sm mt-1 font-semibold ${buySignalResult.predicted_return_percent >= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                        {buySignalResult.predicted_return_percent >= 0 ? '+' : ''}{buySignalResult.predicted_return_percent.toFixed(2)}% expected
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">5-Day Target</p>
-                      <p className="text-2xl font-black text-white tracking-tight mt-1">{formatPrice(stock.sym, buySignalResult.predicted_price_5d)}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-border bg-card p-5 shadow-sm flex flex-col justify-center items-center text-center">
-                  <BrainCircuit className="w-8 h-8 text-gray-700 mb-2" />
-                  <p className="text-xs text-gray-500 font-medium">Buy signal available for AAPL & TSLA only</p>
-                </div>
-              )}
             </div>
 
             {/* Recent Trades for this stock */}

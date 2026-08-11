@@ -52,4 +52,4 @@ uvicorn app.main:app --reload --port 8001
 - **Fallback**: If `CHAT_MODEL_ENABLE_FALLBACK=true`, the system will automatically switch to Gemini if the local service fails.
 
 ## Maintenance
-The other models in the project (Portfolio Rater, Buy Signal Predictor, etc.) remain untouched and will continue to work regardless of the chatbot provider setting.
+The chatbot provider setting affects only chatbot responses; core market, news, and portfolio features remain available independently.

@@ -230,8 +230,8 @@ export default function Login() {
           <div className="space-y-5">
             {[
               { icon: BarChart3, title: 'Real-Time Analytics', desc: 'Live candlestick charts with 50+ technical indicators', color: '#f59e0b' },
-              { icon: Zap, title: 'Instant Predictions', desc: 'LSTM and Random Forest models for price and buy signals', color: '#10b981' },
-              { icon: Shield, title: 'Portfolio Protection', desc: 'Risk alerts and portfolio rating with AI suggestions', color: '#3b82f6' },
+              { icon: Zap, title: 'Live Market Data', desc: 'Current prices, charts, and market movements', color: '#10b981' },
+              { icon: Shield, title: 'Portfolio Protection', desc: 'Risk alerts and position tracking', color: '#3b82f6' },
             ].map((feature) => (
               <div key={feature.title} className="flex items-start gap-4">
                 <div

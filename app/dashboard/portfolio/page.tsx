@@ -12,8 +12,6 @@ import {
   Receipt,
   TrendingUp,
   RefreshCw,
-  Star,
-  Brain,
 } from 'lucide-react';
 
 type MarketStock = {
@@ -58,20 +56,6 @@ type PortfolioResponse = {
   };
 };
 
-type PortfolioRating = {
-  score: number;
-  summary: string;
-  suggestions: Array<{ symbol: string; action: 'BUY' | 'SELL' | 'HOLD'; reason: string }>;
-  risks?: string[];
-  holdingsAnalyzed?: number;
-};
-
-type HoldingSignal = {
-  label: 'BUY' | 'SELL';
-  confidence: number | null;
-  predicted_price_5d?: number | null;
-};
-
 function money(v: number) {
   return `₹${Number(v || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
@@ -102,11 +86,6 @@ export default function PortfolioPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [rating, setRating] = useState<PortfolioRating | null>(null);
-  const [ratingLoading, setRatingLoading] = useState(false);
-  const [ratingError, setRatingError] = useState('');
-  const [holdingSignals, setHoldingSignals] = useState<Record<string, HoldingSignal>>({});
-  const [signalNotice, setSignalNotice] = useState('');
 
   const [selectedSym, setSelectedSym] = useState('');
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
@@ -267,26 +246,6 @@ export default function PortfolioPage() {
     }
   }, [selectedStock, selectedLiveQuote, quantity, side, loadData]);
 
-  const ratePortfolio = useCallback(async () => {
-    setRatingError('');
-    setRatingLoading(true);
-    try {
-      const res = await fetch('/api/portfolio/rate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(typeof data?.error === 'string' ? data.error : 'Portfolio rating failed');
-      }
-      setRating(data as PortfolioRating);
-    } catch (e) {
-      setRatingError(e instanceof Error ? e.message : 'Portfolio rating failed');
-    } finally {
-      setRatingLoading(false);
-    }
-  }, []);
-
   const allocation = useMemo(() => {
     const total = summary.totalMarketValue;
     if (total <= 0) return [] as Array<{ sym: string; pct: number; value: number }>;
@@ -301,87 +260,37 @@ export default function PortfolioPage() {
       .slice(0, 6);
   }, [enrichedHoldings, summary.totalMarketValue]);
 
-  useEffect(() => {
-    let alive = true;
+  const portfolioHealth = useMemo(() => {
+    const pricedHoldings = enrichedHoldings.filter((holding) => holding.marketValue != null);
+    const sectors = new Map<string, number>();
 
-    const loadSignals = async () => {
-      if (enrichedHoldings.length === 0) {
-        if (alive) {
-          setHoldingSignals({});
-          setSignalNotice('');
-        }
-        return;
-      }
+    pricedHoldings.forEach((holding) => {
+      const sector = holding.sector || 'Other';
+      sectors.set(sector, (sectors.get(sector) || 0) + (holding.marketValue || 0));
+    });
 
-      const results = await Promise.all(
-        enrichedHoldings.map(async (h) => {
-          try {
-            // First try the new direct Buy Signal predictor (supports AAPL, TSLA)
-            const buySignalRes = await fetch('/api/predict-buy-signal', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ticker: h.sym }),
-              cache: 'no-store'
-            });
+    const sectorAllocation = Array.from(sectors, ([name, value]) => ({
+      name,
+      value,
+      pct: summary.totalMarketValue > 0 ? (value / summary.totalMarketValue) * 100 : 0,
+    })).sort((a, b) => b.value - a.value);
 
-            if (buySignalRes.ok) {
-              const buyData = await buySignalRes.json();
-              return {
-                sym: h.sym,
-                signal: {
-                  label: buyData.signal, // "BUY" or "DO NOT BUY"
-                  confidence: null,      // No confidence score from the Random Forest model
-                  predicted_price_5d: buyData.predicted_price_5d
-                } as HoldingSignal,
-              };
-            }
+    const byPerformance = pricedHoldings
+      .filter((holding) => holding.pnlPct != null)
+      .slice()
+      .sort((a, b) => (b.pnlPct || 0) - (a.pnlPct || 0));
 
-            // Fallback to legacy heuristic route for unsupported stocks
-            const res = await fetch(`/api/market/rf-signal?ticker=${encodeURIComponent(h.sym)}`, { cache: 'no-store' });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) return null;
-            const label = String(data?.label || '').toUpperCase() === 'BUY' ? 'BUY' : 'SELL';
-            const confidence = Number(data?.confidence);
-            return {
-              sym: h.sym,
-              signal: {
-                label,
-                confidence: Number.isFinite(confidence) ? confidence : null,
-                predicted_price_5d: Number.isFinite(Number(data?.predicted_price_5d)) ? Number(data?.predicted_price_5d) : null,
-              } as HoldingSignal,
-            };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      if (!alive) return;
-
-      const nextSignals: Record<string, HoldingSignal> = {};
-      let buyCount = 0;
-      let sellCount = 0;
-
-      for (const row of results) {
-        if (!row) continue;
-        nextSignals[row.sym] = row.signal;
-        if (row.signal.label === 'BUY') buyCount += 1;
-        else sellCount += 1;
-      }
-
-      setHoldingSignals(nextSignals);
-      if (buyCount || sellCount) {
-        setSignalNotice(`AI suggestions updated: ${buyCount} BUY, ${sellCount} SELL`);
-      } else {
-        setSignalNotice('AI suggestions unavailable right now.');
-      }
+    const totalValue = summary.walletBalance + summary.totalMarketValue;
+    return {
+      totalValue,
+      cashPct: totalValue > 0 ? (summary.walletBalance / totalValue) * 100 : 0,
+      largestPosition: allocation[0] || null,
+      sectorAllocation,
+      bestPerformer: byPerformance[0] || null,
+      worstPerformer: byPerformance.length > 1 ? byPerformance[byPerformance.length - 1] : null,
     };
+  }, [allocation, enrichedHoldings, summary]);
 
-    loadSignals();
-    return () => {
-      alive = false;
-    };
-  }, [enrichedHoldings]);
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -393,13 +302,6 @@ export default function PortfolioPage() {
           <p className="text-xs text-gray-500 mt-0.5">Buy, sell, monitor and rebalance your positions live.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/portfolio-rater"
-            className="h-10 rounded-xl bg-primary text-primary-foreground px-4 text-sm font-semibold hover:bg-primary/90 inline-flex items-center gap-2 transition-all shadow-sm"
-          >
-            <Brain className="w-4 h-4" />
-            ML Rater
-          </Link>
           <button
             onClick={loadData}
             disabled={loading}
@@ -433,6 +335,43 @@ export default function PortfolioPage() {
         />
       </section>
 
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 className="text-base font-bold text-white">Portfolio Health</h2>
+            <p className="mt-1 text-xs text-gray-500">A quick view of your value, diversification and position risk.</p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{money(portfolioHealth.totalValue)} total value</span>
+        </div>
+
+        {enrichedHoldings.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border p-5 text-sm text-gray-500">Buy a stock to see allocation, performance and diversification insights here.</p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Quick insights</p>
+              <p className="text-sm text-gray-300">Cash available: <strong className="text-white">{portfolioHealth.cashPct.toFixed(1)}%</strong> of your portfolio.</p>
+              <p className="text-sm text-gray-300">Diversified across <strong className="text-white">{portfolioHealth.sectorAllocation.length}</strong> sector{portfolioHealth.sectorAllocation.length === 1 ? '' : 's'}.</p>
+              {portfolioHealth.largestPosition && (
+                <p className="text-sm text-gray-300">Largest position: <strong className="text-white">{portfolioHealth.largestPosition.sym}</strong> at <strong className={portfolioHealth.largestPosition.pct > 40 ? 'text-amber-400' : 'text-white'}>{portfolioHealth.largestPosition.pct.toFixed(1)}%</strong>.</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Performance</p>
+              {portfolioHealth.bestPerformer ? <p className="text-sm text-gray-300">Best: <strong className="text-[#10b981]">{portfolioHealth.bestPerformer.sym} {portfolioHealth.bestPerformer.pnlPct! >= 0 ? '+' : ''}{portfolioHealth.bestPerformer.pnlPct!.toFixed(2)}%</strong></p> : <p className="text-sm text-gray-500">Waiting for live prices.</p>}
+              {portfolioHealth.worstPerformer ? <p className="text-sm text-gray-300">Needs attention: <strong className="text-[#ef4444]">{portfolioHealth.worstPerformer.sym} {portfolioHealth.worstPerformer.pnlPct! >= 0 ? '+' : ''}{portfolioHealth.worstPerformer.pnlPct!.toFixed(2)}%</strong></p> : <p className="text-sm text-gray-500">Add another priced holding to compare performance.</p>}
+              <p className="text-xs text-gray-500">Performance is based on live price versus your average cost.</p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Sector mix</p>
+              {portfolioHealth.sectorAllocation.length === 0 ? <p className="text-sm text-gray-500">Waiting for live prices.</p> : <div className="space-y-3">{portfolioHealth.sectorAllocation.slice(0, 4).map((sector) => <div key={sector.name}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-300">{sector.name}</span><span className="font-bold text-white">{sector.pct.toFixed(1)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-[#38bdf8]" style={{ width: `${Math.max(3, Math.min(100, sector.pct))}%` }} /></div></div>)}</div>}
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* LEFT COLUMN */}
         <div className="xl:col-span-8 space-y-6">
@@ -443,13 +382,6 @@ export default function PortfolioPage() {
               <h2 className="text-base font-bold text-white">Open Holdings</h2>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-gray-400">{enrichedHoldings.length} positions</span>
             </div>
-
-            {signalNotice && (
-              <div className="px-5 py-3 border-b border-border bg-primary/5 text-sm font-medium text-primary flex items-center gap-2">
-                <Brain className="w-4 h-4" />
-                {signalNotice}
-              </div>
-            )}
 
             {loading ? (
               <div className="p-8 text-center text-sm text-gray-400">Loading holdings...</div>
@@ -466,13 +398,11 @@ export default function PortfolioPage() {
                       <th className="text-right px-5 py-4 font-semibold">LTP</th>
                       <th className="text-right px-5 py-4 font-semibold">Market Value</th>
                       <th className="text-right px-5 py-4 font-semibold">Unrealized</th>
-                      <th className="text-center px-5 py-4 font-semibold">AI Suggestion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
                     {enrichedHoldings.map((h) => {
-                      const up = h.unrealizedPnl >= 0;
-                      const signal = holdingSignals[h.sym];
+                      const up = (h.unrealizedPnl ?? 0) >= 0;
                       return (
                         <tr key={h.sym} className="hover:bg-muted/10 transition-colors">
                           <td className="px-5 py-4">
@@ -491,26 +421,6 @@ export default function PortfolioPage() {
                               </div>
                             ) : (
                               <span className="text-gray-500 font-normal">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            {signal ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span
-                                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold tracking-wide ${
-                                    signal.label === 'BUY'
-                                      ? 'bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20'
-                                      : 'bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20'
-                                  }`}
-                                >
-                                  {signal.label}
-                                </span>
-                                {signal.predicted_price_5d && (
-                                  <span className="text-[10px] text-gray-400 font-medium">Tgt: {money(signal.predicted_price_5d)}</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-500">—</span>
                             )}
                           </td>
                         </tr>
@@ -725,61 +635,6 @@ export default function PortfolioPage() {
             )}
           </div>
 
-          {/* Gemini AI Rater (Legacy) */}
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-[#f59e0b]" />
-                <h3 className="text-base font-bold text-white">Gemini AI Analysis</h3>
-              </div>
-              <button
-                onClick={ratePortfolio}
-                disabled={ratingLoading}
-                className="h-8 rounded-lg bg-muted text-xs font-semibold px-3 hover:bg-muted/80 hover:text-white transition-colors disabled:opacity-50"
-              >
-                {ratingLoading ? 'Analyzing...' : 'Run Analysis'}
-              </button>
-            </div>
-
-            {ratingError && <p className="text-xs text-[#ef4444] bg-[#ef4444]/10 p-2 rounded-lg mb-3">{ratingError}</p>}
-
-            {!rating ? (
-              <p className="text-sm text-gray-500 py-2">Click "Run Analysis" to get LLM-based insights and heuristic suggestions for your portfolio.</p>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-border bg-muted/20 p-4 text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Overall Health Score</p>
-                  <p className="text-4xl font-black text-[#f59e0b] tracking-tighter">{rating.score.toFixed(1)}<span className="text-lg text-gray-500 font-medium">/10</span></p>
-                  <p className="text-xs text-gray-300 mt-2 leading-relaxed">{rating.summary}</p>
-                </div>
-
-                {Array.isArray(rating.suggestions) && rating.suggestions.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Key Recommendations</p>
-                    {rating.suggestions.slice(0, 4).map((s, idx) => (
-                      <div key={`${s.symbol}-${idx}`} className="rounded-xl border border-border bg-background p-3 flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-white">{s.symbol || 'PORTFOLIO'}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
-                              s.action === 'BUY'
-                                ? 'bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20'
-                                : s.action === 'SELL'
-                                  ? 'bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20'
-                                  : 'bg-muted text-gray-300 border border-border'
-                            }`}
-                          >
-                            {s.action}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 leading-relaxed mt-1">{s.reason}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       </section>
     </div>

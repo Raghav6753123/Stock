@@ -35,7 +35,7 @@ sections = [
 ('When use 401, 403, 409 and 500?', '401 is absent/invalid authentication; 403 is authenticated but not allowed; 409 is a conflict such as duplicate email; 500 is an unexpected server fault. Validation errors are normally 400.'),
 ('Why does JWT validity not guarantee immediate logout?', 'A signed access token remains valid until expiry. Use short expiry and session/token-version checks or deny lists for urgent revocation.'),
 ('How defend sign-in endpoints?', 'Rate-limit by IP and account, add progressive delays or CAPTCHA, monitor anomalies, use generic invalid-credential responses, and enforce strong passwords and MFA for sensitive accounts.'),
-('Why have Firebase client/Admin alongside custom JWT?', 'Firebase client supports browser auth and Admin verifies server-side Firebase tokens. Mixing it with custom JWTs can create two identities and inconsistent authorization; choose one authority or explicitly bridge them.'),
+('How is authentication handled?', 'The application uses password authentication stored in MySQL and signed JWT cookies. Keeping one identity system avoids conflicting authorization rules.'),
 ]),
 ('Database and Transactions', [
 ('Why use transaction plus SELECT FOR UPDATE for a trade?', 'The transaction groups wallet, holdings, and ledger changes atomically. FOR UPDATE locks the relevant rows so concurrent trades cannot both act on the same stale balance or quantity.'),
@@ -120,7 +120,7 @@ sections = [
 ('How mock external systems well?', 'Use protocol-accurate fixtures, simulated 429/timeouts/malformed responses, contract tests against sandbox providers, deterministic clocks and a disposable real DB/vector service for integration tests.'),
 ('What load tests run before launch?', 'Quote burst and cache-miss load, sign-in abuse patterns, concurrent same-wallet trades, chat fan-out with upstream slowness, ML saturation, and soak tests for connection leaks.'),
 ('How diagnose slow chat?', 'Trace one request across quote/news fetch, embedding, Chroma, model inference and storage using correlation IDs, timings and distributed traces; compare p50/p95/p99 by dependency.'),
-('Which secrets must stay server-only?', 'Database credentials, JWT secrets, Firebase Admin private key, Gemini/Hugging Face/provider keys and internal service credentials. Only intentionally public Firebase client config may use NEXT_PUBLIC_. Scan bundles/logs and enforce secret checks in CI.'),
+('Which secrets must stay server-only?', 'Database credentials, JWT secrets, Gemini/Hugging Face/provider keys, and internal service credentials must remain server-only. Scan bundles and logs and enforce secret checks in CI.'),
 ('Why keep .env.example but no secrets?', 'It documents required configuration and supports reproducible deploys, but committing usable keys exposes systems permanently through Git history.'),
 ('What is the incident plan for wrong recommendations?', 'Immediately disable or gate the feature, preserve audit evidence, notify affected users as required, investigate data/model/provider changes, correct the issue, validate with staged rollout, and document the postmortem.'),
 ])]

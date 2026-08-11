@@ -6,6 +6,7 @@ import {
   ensurePortfolioHoldingsTable,
   ensurePortfolioTransactionsTable,
 } from '../lib/portfolioSchema';
+import { isTrustedOrigin } from '../lib/requestSecurity';
 
 function roundMoney(value) {
   return Number(Number(value).toFixed(2));
@@ -132,6 +133,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  if (!isTrustedOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
   try {
     const userId = await getAuthenticatedUserId(req);
     if (!userId) {

@@ -3,6 +3,7 @@ import { loadServerEnvOnce } from './loadEnv';
 loadServerEnvOnce();
 
 const API_BASE = 'https://finnhub.io/api/v1';
+const REQUEST_TIMEOUT_MS = 8000;
 
 function getToken() {
   const key = process.env.FINNHUB_API_KEY || process.env.FINHUB_API_KEY || 'd7dcs11r01qggoenstvgd7dcs11r01qggoensu00';
@@ -17,14 +18,21 @@ function normalizeSymbol(symbol) {
 async function requestFinnhub(path, params) {
   const token = getToken();
   const query = new URLSearchParams({ ...params, token });
-  
-  // Use Next.js native fetch caching instead of a complex custom implementation
-  const res = await fetch(`${API_BASE}${path}?${query.toString()}`, {
-    next: { revalidate: 15 },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  if (!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
-  return res.json();
+  try {
+    // Market prices should be fresh. Avoid Next's data cache so a provider
+    // connection reset does not turn into a cache write error.
+    const res = await fetch(`${API_BASE}${path}?${query.toString()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Finnhub HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function getQuote(symbol) {
@@ -83,4 +91,37 @@ export async function getSpark(symbol, options = {}) {
     .slice(-points)
     .map(v => ({ v: Number(v) }))
     .filter(p => p.v > 0);
+}
+
+export async function getComparisonData(symbol) {
+  const resolvedSymbol = normalizeSymbol(symbol);
+  const now = Math.floor(Date.now() / 1000);
+  const yearAgo = now - 365 * 24 * 60 * 60;
+
+  const results = await Promise.allSettled([
+    getQuote(symbol),
+    requestFinnhub('/stock/profile2', { symbol: resolvedSymbol }),
+    requestFinnhub('/stock/metric', { symbol: resolvedSymbol, metric: 'all' }),
+    requestFinnhub('/stock/candle', {
+      symbol: resolvedSymbol,
+      resolution: 'D',
+      from: String(yearAgo),
+      to: String(now),
+    }),
+  ]);
+
+  const quote = results[0].status === 'fulfilled' ? results[0].value : null;
+  if (!quote) throw new Error(`Live quote unavailable for ${symbol}.`);
+  const profile = results[1].status === 'fulfilled' ? results[1].value : {};
+  const metricData = results[2].status === 'fulfilled' ? results[2].value : {};
+  const candles = results[3].status === 'fulfilled' ? results[3].value : {};
+
+  const closes = Array.isArray(candles?.c) ? candles.c.map(Number).filter(Number.isFinite) : [];
+  const firstClose = closes[0];
+  const lastClose = closes[closes.length - 1];
+  const oneYearReturn = firstClose > 0 && lastClose > 0
+    ? ((lastClose - firstClose) / firstClose) * 100
+    : null;
+
+  return { quote, profile, metric: metricData?.metric || {}, oneYearReturn };
 }

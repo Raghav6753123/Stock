@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { clearAuthCookies } from '../../lib/authCookies';
 import getConnection from '../../lib/mysql';
 import jwtUtil from '../../lib/jwt';
+import { isTrustedOrigin } from '../../lib/requestSecurity';
 
 export async function POST(req) {
+  if (!isTrustedOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
   const refreshToken = req.cookies.get(jwtUtil.REFRESH_TOKEN_COOKIE)?.value;
 
   if (refreshToken) {

@@ -8,7 +8,7 @@ import {
   AreaChart, Area, ResponsiveContainer, CartesianGrid, ReferenceLine, YAxis,
 } from 'recharts';
 import {
-  Heart, Search, ArrowUpRight, ArrowDownRight, ArrowLeft, X,
+  Heart, Search, ArrowUpRight, ArrowDownRight, ArrowLeft, BarChart3, X,
 } from 'lucide-react';
 
 function sparkAccent(spark?: { v: number }[]): { color: string; pct: number } {
@@ -123,6 +123,10 @@ export default function StocksPage() {
           <h1 className="text-2xl font-bold">All Stocks</h1>
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} of {stocks.length} stocks</p>
         </div>
+        <Link href="/dashboard/compare" className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 transition-all">
+          <BarChart3 className="w-4 h-4" />
+          Compare Stocks
+        </Link>
       </div>
 
       {/* filters bar */}

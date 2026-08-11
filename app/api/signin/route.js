@@ -4,9 +4,13 @@ import getConnection from '../lib/mysql';
 import { buildAuthCookies } from '../lib/authCookies';
 import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
 import jwtUtil from '../lib/jwt';
+import { clearLoginFailures, isLoginRateLimited, isTrustedOrigin, recordLoginFailure } from '../lib/requestSecurity';
 
 export async function POST(req) {
     try {
+        if (!isTrustedOrigin(req)) {
+            return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+        }
         const body = await req.json().catch(() => ({}));
         const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
         const password = typeof body?.password === 'string' ? body.password : '';
@@ -17,6 +21,9 @@ export async function POST(req) {
         }
         if (email.length > 254 || password.length > 256) {
             return NextResponse.json({ error: 'Invalid input length' }, { status: 400 });
+        }
+        if (isLoginRateLimited(req, email)) {
+            return NextResponse.json({ error: 'Too many login attempts. Try again in 15 minutes.' }, { status: 429 });
         }
 
         const conn = await getConnection();
@@ -41,6 +48,7 @@ export async function POST(req) {
             );
 
             if (!rows || rows.length === 0) {
+                recordLoginFailure(req, email);
                 return NextResponse.json(
                     { error: 'Invalid email or password' },
                     { status: 401 }
@@ -49,6 +57,7 @@ export async function POST(req) {
 
             const user = rows[0];
             if (!user.password_hash) {
+                recordLoginFailure(req, email);
                 return NextResponse.json(
                     { error: 'Password auth is not enabled for this user' },
                     { status: 401 }
@@ -57,6 +66,7 @@ export async function POST(req) {
 
             const ok = await bcrypt.compare(password, user.password_hash);
             if (!ok) {
+                recordLoginFailure(req, email);
                 return NextResponse.json(
                     { error: 'Invalid email or password' },
                     { status: 401 }
@@ -77,6 +87,7 @@ export async function POST(req) {
                 'UPDATE users SET refresh_token_hash = ?, refresh_token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND) WHERE id = ?',
                 [refreshTokenHash, refreshTtl, user.id]
             );
+            clearLoginFailures(req, email);
             const cookies = buildAuthCookies({
                 accessToken,
                 refreshToken,

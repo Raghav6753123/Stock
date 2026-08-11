@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Newspaper, ExternalLink, Clock, ChevronDown, ChevronUp,
-  Zap,
+  Zap, BriefcaseBusiness, Brain,
 } from 'lucide-react';
 
 /* ── types ─────────────────────────────────────────────────────────────── */
@@ -20,6 +20,9 @@ type NewsItem = {
   imageUrl?: string | null;
 };
 
+type Holding = { sym: string; name: string };
+type MarketStock = { sym: string; chg: number };
+
 /* ── constants ─────────────────────────────────────────────────────────── */
 const SENTIMENT_STYLES: Record<string, { bg: string; text: string; border: string; icon: string }> = {
   bullish: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: '↑' },
@@ -29,24 +32,59 @@ const SENTIMENT_STYLES: Record<string, { bg: string; text: string; border: strin
 
 const IMPACT_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
 
+function eventLabel(item: NewsItem) {
+  const text = `${item.headline} ${item.description || ''}`.toLowerCase();
+  if (/earnings|quarterly|revenue|profit|results/.test(text)) return 'Earnings';
+  if (/fed|rbi|interest rate|inflation|bond yield/.test(text)) return 'Market';
+  if (/technology|banking|pharma|energy|oil|chip/.test(text)) return 'Sector';
+  return 'General';
+}
+
+function relatedHoldings(item: NewsItem, holdings: Holding[]) {
+  const text = `${item.headline} ${item.description || ''}`.toLowerCase();
+  return holdings.filter((holding) => {
+    const symbol = holding.sym.toLowerCase();
+    const name = holding.name.toLowerCase();
+    return text.includes(symbol) || (name.length > 3 && text.includes(name));
+  });
+}
+
 /* ── page ──────────────────────────────────────────────────────────────── */
 export default function NewsPage() {
   const [news, setNews]         = useState<NewsItem[]>([]);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [market, setMarket] = useState<MarketStock[]>([]);
   const [loading, setLoading]   = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/news/realtime?count=50', { cache: 'no-store' })
-      .then((r) => r.json())
+    Promise.all([
+      fetch('/api/news/realtime?count=50', { cache: 'no-store' }),
+      fetch('/api/portfolio', { cache: 'no-store' }),
+      fetch('/api/market/stocks?liveOnly=1', { cache: 'no-store' }),
+    ])
+      .then(async ([newsRes, portfolioRes, marketRes]) => ({
+        news: await newsRes.json().catch(() => ({})),
+        portfolio: await portfolioRes.json().catch(() => ({})),
+        market: await marketRes.json().catch(() => ({})),
+      }))
       .then((d) => {
         if (!alive) return;
-        if (Array.isArray(d?.news)) setNews(d.news);
+        if (Array.isArray(d.news?.news)) setNews(d.news.news);
+        if (Array.isArray(d.portfolio?.holdings)) setHoldings(d.portfolio.holdings);
+        if (Array.isArray(d.market?.stocks)) setMarket(d.market.stocks);
         setLoading(false);
       })
       .catch(() => setLoading(false));
     return () => { alive = false; };
   }, []);
+
+  const portfolioNews = useMemo(() => news
+    .map((item) => ({ item, holdings: relatedHoldings(item, holdings) }))
+    .filter((row) => row.holdings.length > 0), [news, holdings]);
+
+  const marketBySymbol = useMemo(() => new Map(market.map((stock) => [stock.sym, stock])), [market]);
 
   return (
     <>
@@ -60,6 +98,19 @@ export default function NewsPage() {
           <p className="text-xs text-gray-500 mt-0.5">{news.length} articles from live feed</p>
         </div>
       </div>
+
+      {!loading && holdings.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-white"><BriefcaseBusiness className="w-4 h-4 text-primary" /> News affecting your portfolio</h2>
+              <p className="mt-1 text-xs text-gray-500">Recent articles that mention stocks you currently hold.</p>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">{portfolioNews.length} matches</span>
+          </div>
+          {portfolioNews.length === 0 ? <p className="rounded-xl bg-muted/30 p-4 text-sm text-gray-500">No current feed articles mention your holdings. Your full market feed is below.</p> : <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{portfolioNews.slice(0, 4).map(({ item, holdings: matched }, index) => <PortfolioNewsCard key={`${item.headline}-${index}`} item={item} holdings={matched} marketBySymbol={marketBySymbol} />)}</div>}
+        </section>
+      )}
 
       {/* articles grid */}
       {loading ? (
@@ -88,6 +139,16 @@ export default function NewsPage() {
       )}
     </>
   );
+}
+
+function PortfolioNewsCard({ item, holdings, marketBySymbol }: { item: NewsItem; holdings: Holding[]; marketBySymbol: Map<string, MarketStock> }) {
+  const prompt = `Why does this news matter to my portfolio? Article: ${item.headline}. ${item.description || ''} My related holdings: ${holdings.map((holding) => holding.sym).join(', ')}. Explain the possible impact in simple language without giving buy or sell instructions.`;
+  return <div className="rounded-xl border border-border bg-muted/20 p-4">
+    <div className="mb-2 flex items-center gap-2"><span className="rounded-md bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">{eventLabel(item)}</span><span className="text-[10px] text-gray-500">{item.time}</span></div>
+    <p className="text-sm font-semibold leading-snug text-gray-100">{item.headline}</p>
+    <div className="mt-3 flex flex-wrap items-center gap-2">{holdings.map((holding) => { const change = marketBySymbol.get(holding.sym)?.chg; return <span key={holding.sym} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-bold text-white">{holding.sym} {change != null && Number.isFinite(change) ? <span className={change >= 0 ? 'text-emerald-400' : 'text-red-400'}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</span> : null}</span>; })}</div>
+    <Link href={`/dashboard/ai?prompt=${encodeURIComponent(prompt.slice(0, 1200))}`} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80"><Brain className="w-3.5 h-3.5" /> Why this matters</Link>
+  </div>;
 }
 
 /* ── news full card ───────────────────────────────────────────────────── */
@@ -120,6 +181,7 @@ function NewsFullCard({
           <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${s.bg} ${s.text} ${s.border}`}>
             {s.icon} {item.sentiment}
           </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border border-border bg-muted text-gray-400">{eventLabel(item)}</span>
           <span
             className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border"
             style={{

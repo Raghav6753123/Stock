@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import getConnection from '../lib/mysql';
 import jwtUtil from '../lib/jwt';
 import { ensureWalletRow, ensureWalletTable } from '../lib/walletSchema';
+import { isTrustedOrigin } from '../lib/requestSecurity';
 
 async function getAuthenticatedUserId(req) {
   const accessToken = req.cookies.get(jwtUtil.ACCESS_TOKEN_COOKIE)?.value;
@@ -51,6 +52,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  if (!isTrustedOrigin(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
   try {
     const userId = await getAuthenticatedUserId(req);
     if (!userId) {

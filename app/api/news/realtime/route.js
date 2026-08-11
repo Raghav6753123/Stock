@@ -13,7 +13,7 @@ const NEWS_FALLBACK = [
 ];
 
 export async function GET(request) {
-  // Keep a consistent fresh-50 feed for UI and downstream sentiment processing.
+  // Keep a consistent fresh-50 feed for the UI.
   const count = FIXED_NEWS_COUNT;
 
   try {
@@ -23,30 +23,6 @@ export async function GET(request) {
       maxArticles: count,
       ttlMs: 15 * 60_000,
     });
-
-    // Call custom Python BiLSTM sentiment model to classify headlines
-    try {
-      const mlUrl = process.env.ML_SERVICE_URL || 'http://localhost:8001';
-      const headlines = result.items.map(item => item.headline);
-      const res = await fetch(`${mlUrl}/api/models/news-sentiment/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: headlines }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const predictions = data.results || [];
-        predictions.forEach((pred, index) => {
-          if (result.items[index]) {
-            result.items[index].sentiment = pred.sentiment;
-            result.items[index].sentimentConfidence = pred.confidence;
-            result.items[index].sentimentReview = `BiLSTM model prediction: ${pred.sentiment} (Confidence: ${(pred.confidence * 100).toFixed(1)}%)`;
-          }
-        });
-      }
-    } catch (e) {
-      console.error("Failed to fetch sentiment from local ML model:", e);
-    }
 
     await upsertNewsToChroma(result.items).catch(() => {});
 

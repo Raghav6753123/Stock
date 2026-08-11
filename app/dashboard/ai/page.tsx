@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Brain, Send, Loader2, ArrowLeft, Plus } from 'lucide-react';
+import { Brain, Send, Loader2, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 type ChatMessage = {
@@ -10,6 +10,7 @@ type ChatMessage = {
   text: string;
   createdAt: string;
   meta?: any;
+  action?: { type: 'trade' | 'alert' | 'observation'; symbol: string; side?: 'BUY' | 'SELL'; quantity?: number; direction?: 'above' | 'below'; targetPrice?: number; thesis?: string; hours?: number };
 };
 
 function makeId() {
@@ -41,6 +42,9 @@ const SUGGESTED = [
   'Summarize top opportunities in technology stocks.',
   'Compare AAPL vs MSFT in one short view.',
   'What are the riskiest stocks from current data?',
+  'Buy 2 shares of AAPL',
+  'Notify me when TSLA goes above 300',
+  'Observe NVDA for 24 hours because I want to track AI demand news.',
 ];
 
 const SESSION_KEY = 'stonks_ai_session_id';
@@ -85,6 +89,11 @@ export default function AiChatPage() {
   }, []);
 
   useEffect(() => {
+    const prompt = new URLSearchParams(window.location.search).get('prompt');
+    if (prompt) setInput(prompt);
+  }, []);
+
+  useEffect(() => {
     if (!listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, loading]);
@@ -111,6 +120,7 @@ export default function AiChatPage() {
           role: m?.role === 'user' ? 'user' : 'assistant',
           text: String(m?.text || ''),
           createdAt: String(m?.createdAt || new Date().toISOString()),
+          action: m?.action || undefined,
         }));
         setMessages(normalized);
       })
@@ -138,7 +148,11 @@ export default function AiChatPage() {
   function startNewChat() {
     const next = makeId();
     const newSession = { id: next, date: new Date().toISOString() };
-    const updated = [newSession, ...recentSessions].slice(0, 5);
+    if (recentSessions.length >= 3) {
+      setError('You can keep up to 3 chats. Delete one before creating another.');
+      return;
+    }
+    const updated = [newSession, ...recentSessions];
     localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(updated));
     setRecentSessions(updated);
     setSessionId(next);
@@ -204,6 +218,7 @@ export default function AiChatPage() {
         text: String(data?.answer || 'No response generated.'),
         createdAt: new Date().toISOString(),
         meta: data?.meta,
+        action: data?.action,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -215,6 +230,55 @@ export default function AiChatPage() {
           ? err.message
           : 'Something went wrong.';
       setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteChat(id: string) {
+    if (loading) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/ai/chat?sessionId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Unable to delete chat.');
+
+      const updated = recentSessions.filter((chat) => chat.id !== id);
+      if (updated.length === 0) {
+        const next = makeId();
+        const first = { id: next, date: new Date().toISOString() };
+        localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([first]));
+        setRecentSessions([first]);
+        setSessionId(next);
+      } else {
+        localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(updated));
+        setRecentSessions(updated);
+        if (id === sessionId) setSessionId(updated[0].id);
+      }
+      setMessages([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete chat.');
+    }
+  }
+
+  async function confirmAction(message: ChatMessage) {
+    if (!message.action) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/ai/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: message.action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Action failed.');
+      setMessages((prev) => [
+        ...prev.map((item) => item.id === message.id ? { ...item, action: undefined } : item),
+        { id: makeId(), role: 'assistant', text: data.answer, createdAt: new Date().toISOString() },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed.');
     } finally {
       setLoading(false);
     }
@@ -244,23 +308,27 @@ export default function AiChatPage() {
         </button>
       </div>
 
-      {recentSessions.length > 1 && (
+      {recentSessions.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <span className="text-xs font-medium text-muted-foreground mr-1 whitespace-nowrap">Recent:</span>
           {recentSessions.map((s, i) => {
             const num = recentSessions.length - i;
             return (
-              <button
-                key={s.id}
-                onClick={() => switchChat(s.id)}
-                className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-all border ${
-                  s.id === sessionId 
-                    ? 'bg-primary text-primary-foreground border-primary font-medium' 
-                    : 'bg-muted border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Chat {num}
-              </button>
+              <div key={s.id} className="flex items-center rounded-full border border-border overflow-hidden">
+                <button
+                  onClick={() => switchChat(s.id)}
+                  className={`text-xs px-3 py-1.5 whitespace-nowrap transition-all ${
+                    s.id === sessionId
+                      ? 'bg-primary text-primary-foreground font-medium'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Chat {num}
+                </button>
+                <button onClick={() => deleteChat(s.id)} aria-label={`Delete chat ${num}`} className="px-2 py-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-500/10">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -306,7 +374,13 @@ export default function AiChatPage() {
                   }`}
                 >
                   <div className="whitespace-pre-wrap"><FormattedText text={m.text} /></div>
-                  {m.meta && (
+                  {m.action && (
+                    <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
+                      <button onClick={() => confirmAction(m)} disabled={loading} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50">{m.action.type === 'trade' ? 'Send confirmation email' : m.action.type === 'observation' ? 'Start observation' : 'Confirm action'}</button>
+                      <span className="text-xs text-gray-500">{m.action.type === 'trade' ? 'The order is placed only after email approval.' : 'Nothing happens until you confirm.'}</span>
+                    </div>
+                  )}
+                  {m.meta && !m.action && (
                     <div className="mt-2 pt-2 border-t border-border text-[10px] text-gray-500 flex flex-wrap gap-2">
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">Stocks context: {m.meta.stockMatches}</span>
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">News context: {m.meta.newsMatches}</span>

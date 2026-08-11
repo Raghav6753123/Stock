@@ -68,8 +68,8 @@ export default function Home() {
   const featureCards = [
     { icon: BarChart3, title: "Real-Time Charts", desc: "Interactive candlestick charts with 50+ technical indicators", color: "#10b981", tags: ["Live Data", "50+ Indicators"] },
     { icon: Brain, title: "AI Explanations", desc: "Human-readable AI insights and technical analysis", color: "#6366f1", tags: ["GPT-Powered", "Actionable"] },
-    { icon: MessageSquare, title: "News Sentiment", desc: "Real-time sentiment analysis and news summaries", color: "#f59e0b", tags: ["Real-Time", "Summaries"] },
-    { icon: TrendingUp, title: "Price Predictions", desc: "ML-powered forecasting with confidence bands", color: "#10b981", tags: ["ML Models", "Alerts"] },
+    { icon: MessageSquare, title: "Market News", desc: "Real-time market news and company updates", color: "#f59e0b", tags: ["Real-Time", "News"] },
+    { icon: TrendingUp, title: "Price Charts", desc: "Interactive charts for tracking market movements", color: "#10b981", tags: ["Charts", "History"] },
     { icon: Shield, title: "Risk Alerts", desc: "Instant volatility spikes and portfolio risk signals", color: "#ef4444", tags: ["Risk Score", "Stops"] },
     { icon: BarChart3, title: "Portfolio Heatmap", desc: "See sector exposure and diversification at a glance", color: "#22c55e", tags: ["Sectors", "Diversify"] },
   ];
@@ -261,7 +261,7 @@ export default function Home() {
 
               {/* Description */}
               <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                Real-time stock analysis, technical indicators, news sentiment, and AI-generated explanations to make informed decisions.
+                Real-time stock analysis, technical indicators, market news, and AI-generated explanations to make informed decisions.
               </p>
 
               {/* CTA Buttons */}
@@ -840,7 +840,7 @@ export default function Home() {
                         <h3 className="text-xl font-bold text-white group-hover:text-[#f59e0b] transition-colors">Analyze & Learn</h3>
                       </div>
                       <p className="text-gray-400 leading-relaxed">
-                        Explore interactive charts, AI-powered insights, real-time news sentiment, and ML-based price predictions.
+                        Explore interactive charts, AI-powered insights, and real-time market news.
                       </p>
                       <div className="flex gap-2 mt-4">
                         <span className="px-3 py-1 rounded-full bg-[#f59e0b]/10 text-[#f59e0b] text-xs font-medium">AI Insights</span>
@@ -1037,7 +1037,7 @@ export default function Home() {
                     'AI-powered insights',
                     '50+ technical indicators',
                     'Real-time price alerts',
-                    'News sentiment analysis',
+                    'Market news updates',
                     'Priority support'
                   ].map((feature, i) => (
                     <li key={i} className="flex items-center gap-3 text-gray-300 text-sm">

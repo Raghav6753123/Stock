@@ -11,7 +11,7 @@ import {
   Heart, ChevronRight, ArrowUpRight, ArrowDownRight,
   Newspaper, BarChart3, TrendingUp, TrendingDown, Clock,
   ExternalLink, Wallet, RefreshCw, Zap, Brain,
-  PieChart as PieIcon, Receipt,
+  Receipt,
 } from 'lucide-react';
 
 /* ── types ─────────────────────────────────────────────────────────────── */
@@ -552,7 +552,6 @@ export default function DashboardPage() {
               {[
                 { label: 'Portfolio', href: '/dashboard/portfolio', icon: Wallet, color: '#10b981' },
                 { label: 'AI Chat', href: '/dashboard/ai', icon: Brain, color: '#38bdf8' },
-                { label: 'ML Rater', href: '/dashboard/portfolio-rater', icon: PieIcon, color: '#f59e0b' },
                 { label: 'Transactions', href: '/dashboard/transactions', icon: Receipt, color: '#a78bfa' },
               ].map((action) => (
                 <Link

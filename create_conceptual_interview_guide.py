@@ -18,7 +18,7 @@ S = [
 ('How do frontend and backend communicate?', 'React pages call Next.js API routes using HTTP. The routes validate requests, call the database or external providers/ML service, and return JSON used by the UI.'),
 ('Why is the ML part separated into FastAPI?', 'The trained models and their Python libraries are easier to run in Python. Keeping them separate also prevents heavy model loading from slowing or complicating the Next.js server.'),
 ('What would you improve if the app gets many users?', 'I would introduce shared caching for market data, rate limits, managed database connection pooling, queues for slow work, monitoring, and independently scale the ML service.'),
-('What is the role of environment variables?', 'They keep database credentials, JWT secrets, Firebase settings, provider keys, and ML URLs out of source code. Different environments can use different values without code changes.'),
+('What is the role of environment variables?', 'They keep database credentials, JWT secrets, and provider keys out of source code. Different environments can use different values without code changes.'),
 ('Why are API routes useful instead of calling providers directly from the browser?', 'They hide API keys, centralize validation and error handling, apply caching and rate limits, and allow us to normalize data from different providers before the UI sees it.'),
 ('If an interviewer asks about limitations, what would you say?', 'It is an educational/simulation-focused application. Market-data quality depends on providers, models cover limited tickers, and AI output is informative rather than financial advice.'),
 ]),

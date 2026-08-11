@@ -14,6 +14,7 @@ const STOCKS_COLLECTION = 'stonks_stocks_bge_v2';
 const CHATS_COLLECTION = 'stonks_chats_bge_v2';
 const NEWS_COLLECTION = 'stonks_news_bge_v2';
 const PORTFOLIO_COLLECTION = 'stonks_portfolio_bge_v2';
+const chromaEnabled = Boolean(process.env.CHROMA_URL);
 
 let clientPromise = null;
 
@@ -115,7 +116,7 @@ function newsDoc(item) {
 }
 
 export async function upsertStocksToChroma(stocks) {
-  if (!stocks?.length) return 0;
+  if (!chromaEnabled || !stocks?.length) return 0;
   try {
     const collection = await getCollection(STOCKS_COLLECTION, 'stocks');
     const ids = stocks.map((s) => `stock:${s.sym}`);
@@ -134,7 +135,7 @@ export async function upsertStocksToChroma(stocks) {
 }
 
 export async function upsertNewsToChroma(newsItems) {
-  if (!newsItems?.length) return 0;
+  if (!chromaEnabled || !newsItems?.length) return 0;
   try {
     const collection = await getCollection(NEWS_COLLECTION, 'news');
     const ids = newsItems.map((_, i) => `news:${Date.now()}:${i}`);
@@ -152,7 +153,7 @@ export async function upsertNewsToChroma(newsItems) {
 }
 
 export async function upsertPortfolioSnapshotToChroma(snapshot) {
-  if (!snapshot?.userId) return false;
+  if (!chromaEnabled || !snapshot?.userId) return false;
   try {
     const collection = await getCollection(PORTFOLIO_COLLECTION, 'portfolio');
     const id = `portfolio:${snapshot.userId}`;
@@ -168,6 +169,7 @@ export async function upsertPortfolioSnapshotToChroma(snapshot) {
 }
 
 export async function queryChromaContext(prompt, opts = {}) {
+  if (!chromaEnabled) return { stocks: [], news: [], chats: [] };
   try {
     const q = (await bgeEmbeddings([prompt], { query: true }))[0];
     const [stocksColl, newsColl, chatsColl] = await Promise.all([
@@ -194,6 +196,7 @@ export async function queryChromaContext(prompt, opts = {}) {
 }
 
 export async function storeChatTurn({ sessionId, prompt, answer }) {
+  if (!chromaEnabled) return false;
   try {
     const collection = await getCollection(CHATS_COLLECTION, 'chats');
     const docs = [`Role: user\nPrompt: ${prompt}`, `Role: assistant\nAnswer: ${answer}`];
@@ -210,7 +213,7 @@ export async function storeChatTurn({ sessionId, prompt, answer }) {
 }
 
 export async function getChatHistory(sessionId, limit = 80) {
-  if (!sessionId) return [];
+  if (!chromaEnabled || !sessionId) return [];
   try {
     const collection = await getCollection(CHATS_COLLECTION, 'chats');
     const result = await collection.get({ where: { sessionId: String(sessionId) }, include: ['documents', 'metadatas'] });
