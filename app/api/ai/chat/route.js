@@ -502,6 +502,19 @@ export async function GET(req) {
   try {
     const userId = await getUserId(req);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (req.nextUrl.searchParams.get('list') === '1') {
+      const conn = await getConnection();
+      try {
+        await ensureChatTables(conn);
+        const [sessions] = await conn.query(
+          'SELECT id, updated_at FROM ai_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?',
+          [userId, MAX_SAVED_CHATS]
+        );
+        return NextResponse.json({ sessions: sessions.map((session) => ({ id: String(session.id), date: session.updated_at })) }, { headers: { 'Cache-Control': 'no-store' } });
+      } finally {
+        conn.release();
+      }
+    }
     const sessionId = String(req.nextUrl.searchParams.get('sessionId') || '').trim().slice(0, 100);
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });

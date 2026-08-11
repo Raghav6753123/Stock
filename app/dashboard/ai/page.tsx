@@ -64,29 +64,42 @@ export default function AiChatPage() {
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    let history: {id: string, date: string}[] = [];
+    let localHistory: {id: string, date: string}[] = [];
     try {
       const stored = localStorage.getItem(RECENT_SESSIONS_KEY);
-      if (stored) history = JSON.parse(stored);
+      if (stored) localHistory = JSON.parse(stored);
     } catch {}
 
     const oldSession = localStorage.getItem(SESSION_KEY);
-    if (history.length === 0 && oldSession) {
-      history = [{ id: oldSession, date: new Date().toISOString() }];
-      localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(history));
+    if (localHistory.length === 0 && oldSession) {
+      localHistory = [{ id: oldSession, date: new Date().toISOString() }];
     }
 
-    if (history.length > 0) {
-      setRecentSessions(history);
-      setSessionId(history[0].id);
-    } else {
-      const next = makeId();
-      history = [{ id: next, date: new Date().toISOString() }];
-      localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(history));
-      setRecentSessions(history);
-      setSessionId(next);
-    }
+    fetch('/api/ai/chat?list=1', { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : { sessions: [] })
+      .then((data) => {
+        const saved = Array.isArray(data?.sessions) ? data.sessions : [];
+        const merged = [...saved, ...localHistory.filter((item) => !saved.some((session: { id: string }) => session.id === item.id))].slice(0, 3);
+        const active = merged.find((item) => item.id === oldSession) || merged[0] || { id: makeId(), date: new Date().toISOString() };
+        const sessions = merged.length ? merged : [active];
+        localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(sessions));
+        localStorage.setItem(SESSION_KEY, active.id);
+        setRecentSessions(sessions);
+        setSessionId(active.id);
+      })
+      .catch(() => {
+        const active = localHistory[0] || { id: makeId(), date: new Date().toISOString() };
+        const sessions = localHistory.length ? localHistory : [active];
+        localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(sessions));
+        localStorage.setItem(SESSION_KEY, active.id);
+        setRecentSessions(sessions);
+        setSessionId(active.id);
+      });
   }, []);
+
+  useEffect(() => {
+    if (sessionId) localStorage.setItem(SESSION_KEY, sessionId);
+  }, [sessionId]);
 
   useEffect(() => {
     const prompt = new URLSearchParams(window.location.search).get('prompt');
