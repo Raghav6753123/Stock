@@ -385,6 +385,7 @@ export default function AiChatPage() {
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">Stocks context: {m.meta.stockMatches}</span>
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">News context: {m.meta.newsMatches}</span>
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">Memory: {m.meta.memoryMatches}</span>
+                      <span className="bg-background/50 px-1.5 py-0.5 rounded">Vector matches: {(m.meta.vectorStockMatches || 0) + (m.meta.vectorNewsMatches || 0) + (m.meta.vectorMemoryMatches || 0)}</span>
                       <span className="bg-background/50 px-1.5 py-0.5 rounded">Model: {m.meta.model}</span>
                     </div>
                   )}

@@ -5,7 +5,7 @@ import { RunnableSequence } from '@langchain/core/runnables';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { z } from 'zod';
 import { loadServerEnvOnce } from '../../lib/loadEnv';
-import { getQuote } from '../../lib/finnhub';
+import { getBatchQuotes, getQuote } from '../../lib/finnhub';
 import { isTrustedOrigin } from '../../lib/requestSecurity';
 import getConnection from '../../lib/mysql';
 import jwtUtil from '../../lib/jwt';
@@ -222,10 +222,25 @@ async function fetchStocksFromApi(origin) {
   const res = await fetch(`${origin}/api/market/stocks`, { cache: 'no-store', signal: controller.signal })
     .catch(() => null)
     .finally(() => clearTimeout(timeoutId));
-  if (!res) return [];
-  if (!res.ok) return [];
-  const data = await res.json().catch(() => ({}));
-  return Array.isArray(data?.stocks) ? data.stocks : [];
+  if (res?.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (Array.isArray(data?.stocks) && data.stocks.length) return data.stocks;
+  }
+
+  // A Railway service can occasionally time out while calling its own public
+  // URL. Use Finnhub directly so the chat remains available in that case.
+  const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA'];
+  const quotes = await getBatchQuotes(symbols).catch(() => ({}));
+  return symbols
+    .filter((symbol) => quotes[symbol]?.price > 0)
+    .map((symbol) => ({
+      sym: symbol,
+      name: symbol,
+      sector: 'Market data',
+      price: quotes[symbol].price,
+      chg: quotes[symbol].percentChange,
+      live: true,
+    }));
 }
 
 async function fetchNewsFromApi(origin) {
@@ -568,16 +583,17 @@ export async function POST(req) {
       await upsertNewsToChroma(news).catch(() => {});
     }
 
-    const stockDocs = toStockDocs(stocks);
-    const newsDocs = toNewsDocs(news);
     const context = await withTimeout(
-      queryChromaContext(prompt, { stockLimit: 1, newsLimit: 1, chatLimit: 8 }),
+      queryChromaContext(prompt, { stockLimit: 8, newsLimit: 10, chatLimit: 8, sessionId }),
       CHROMA_TIMEOUT_MS,
       'Context query'
     );
-    const chatDocs = history.slice(-8).map((message) => ({
+    const stockDocs = context.stocks.length ? context.stocks : toStockDocs(stocks);
+    const newsDocs = context.news.length ? context.news : toNewsDocs(news);
+    const savedChatDocs = history.slice(-8).map((message) => ({
       document: `Role: ${message.role}\n${message.text}`,
     }));
+    const chatDocs = context.chats.length ? context.chats : savedChatDocs;
 
     let agentResult = null;
     try {
@@ -730,6 +746,9 @@ export async function POST(req) {
           stockMatches: stockDocs.length,
           newsMatches: newsDocs.length,
           memoryMatches: chatDocs.length,
+          vectorStockMatches: context.stocks.length,
+          vectorNewsMatches: context.news.length,
+          vectorMemoryMatches: context.chats.length,
           model: usedProvider === 'gemini' || usedProvider === 'gemini-agent' ? GEMINI_MODEL : (usedProvider === 'huggingface' ? 'hf-fine-tuned' : 'local_finetuned'),
           provider: usedProvider,
           sessionLimit: MAX_SESSION_MESSAGES,

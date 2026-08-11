@@ -10,13 +10,18 @@ const BGE_SOURCE_DIM = 384;
 const EMBED_DIM = BGE_SOURCE_DIM;
 const EMBEDDING_TIMEOUT_MS = Number(process.env.BGE_EMBEDDING_TIMEOUT_MS || 8000);
 
-const STOCKS_COLLECTION = 'stonks_stocks_bge_v2';
-const CHATS_COLLECTION = 'stonks_chats_bge_v2';
-const NEWS_COLLECTION = 'stonks_news_bge_v2';
-const PORTFOLIO_COLLECTION = 'stonks_portfolio_bge_v2';
+// v3 collections intentionally have no Chroma-managed embedding function.
+// This service always sends precomputed BGE embeddings, so persisting our custom
+// JS embedding object as a legacy function only makes remote Chroma servers emit
+// schema-deserialization warnings when the collection is opened again.
+const STOCKS_COLLECTION = 'stonks_stocks_bge_v3';
+const CHATS_COLLECTION = 'stonks_chats_bge_v3';
+const NEWS_COLLECTION = 'stonks_news_bge_v3';
+const PORTFOLIO_COLLECTION = 'stonks_portfolio_bge_v3';
 const chromaEnabled = Boolean(process.env.CHROMA_URL);
 
 let clientPromise = null;
+const collectionPromises = new Map();
 
 async function bgeEmbeddings(texts, { query = false } = {}) {
   const inputs = texts.map((text) => {
@@ -54,15 +59,6 @@ async function bgeEmbeddings(texts, { query = false } = {}) {
   }
 }
 
-const BGE_EMBEDDING_FUNCTION = {
-  name: 'bge-small-en-v1.5',
-  generate: async (texts) => bgeEmbeddings(texts),
-  generateForQueries: async (texts) => bgeEmbeddings(texts, { query: true }),
-  defaultSpace: () => 'cosine',
-  supportedSpaces: () => ['cosine', 'l2', 'ip'],
-  getConfig: () => ({ provider: 'huggingface', model: BGE_MODEL, sourceDim: BGE_SOURCE_DIM, dim: EMBED_DIM }),
-};
-
 const HNSW_COSINE_CONFIGURATION = { hnsw: { space: 'cosine' } };
 
 async function getClient() {
@@ -82,13 +78,21 @@ async function getClient() {
 }
 
 async function getCollection(name, kind) {
-  const client = await getClient();
-  return client.getOrCreateCollection({
-    name,
-    metadata: { app: 'stonks', kind },
-    configuration: HNSW_COSINE_CONFIGURATION,
-    embeddingFunction: BGE_EMBEDDING_FUNCTION,
-  });
+  if (!collectionPromises.has(name)) {
+    const collectionPromise = getClient()
+      .then((client) => client.getOrCreateCollection({
+        name,
+        metadata: { app: 'stonks', kind },
+        configuration: HNSW_COSINE_CONFIGURATION,
+        embeddingFunction: null,
+      }))
+      .catch((error) => {
+        collectionPromises.delete(name);
+        throw error;
+      });
+    collectionPromises.set(name, collectionPromise);
+  }
+  return collectionPromises.get(name);
 }
 
 async function safeUpsert(collection, payload) {
@@ -178,10 +182,17 @@ export async function queryChromaContext(prompt, opts = {}) {
       getCollection(CHATS_COLLECTION, 'chats')
     ]);
 
+    const chatOptions = {
+      queryEmbeddings: [q],
+      nResults: opts.chatLimit || 8,
+      include: ['documents', 'metadatas', 'distances'],
+    };
+    if (opts.sessionId) chatOptions.where = { sessionId: String(opts.sessionId) };
+
     const [stockRes, newsRes, chatRes] = await Promise.all([
       stocksColl.query({ queryEmbeddings: [q], nResults: opts.stockLimit || 8, include: ['documents', 'metadatas', 'distances'] }),
       newsColl.query({ queryEmbeddings: [q], nResults: opts.newsLimit || 10, include: ['documents', 'metadatas', 'distances'] }),
-      chatsColl.query({ queryEmbeddings: [q], nResults: opts.chatLimit || 8, include: ['documents', 'metadatas', 'distances'] })
+      chatsColl.query(chatOptions)
     ]);
 
     const mapRes = (res) => (res?.documents?.[0] || []).map((doc, i) => ({
