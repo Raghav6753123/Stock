@@ -10,7 +10,7 @@ type ChatMessage = {
   text: string;
   createdAt: string;
   meta?: any;
-  action?: { type: 'trade' | 'alert' | 'observation'; symbol: string; side?: 'BUY' | 'SELL'; quantity?: number; direction?: 'above' | 'below'; targetPrice?: number; thesis?: string; hours?: number };
+  action?: { type: 'trade' | 'alert' | 'observation'; symbol: string; side?: 'BUY' | 'SELL'; quantity?: number; direction?: 'above' | 'below'; targetPrice?: number; thesis?: string; hours?: number; status?: 'email_sent' };
 };
 
 function makeId() {
@@ -269,12 +269,12 @@ export default function AiChatPage() {
       const res = await fetch('/api/ai/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: message.action }),
+        body: JSON.stringify({ action: message.action, chatMessageId: message.id }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Action failed.');
       setMessages((prev) => [
-        ...prev.map((item) => item.id === message.id ? { ...item, action: undefined } : item),
+        ...prev.map((item) => item.id === message.id ? { ...item, action: message.action?.type === 'trade' ? { ...message.action, status: 'email_sent' as const } : undefined } : item),
         { id: makeId(), role: 'assistant', text: data.answer, createdAt: new Date().toISOString() },
       ]);
     } catch (err) {
@@ -374,11 +374,14 @@ export default function AiChatPage() {
                   }`}
                 >
                   <div className="whitespace-pre-wrap"><FormattedText text={m.text} /></div>
-                  {m.action && (
+                  {m.action && m.action.status !== 'email_sent' && (
                     <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
                       <button onClick={() => confirmAction(m)} disabled={loading} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50">{m.action.type === 'trade' ? 'Send confirmation email' : m.action.type === 'observation' ? 'Start observation' : 'Confirm action'}</button>
                       <span className="text-xs text-gray-500">{m.action.type === 'trade' ? 'The order is placed only after email approval.' : 'Nothing happens until you confirm.'}</span>
                     </div>
+                  )}
+                  {m.action?.status === 'email_sent' && (
+                    <div className="mt-3 pt-3 border-t border-border text-xs text-gray-500">Confirmation email sent. This order is placed only after email approval.</div>
                   )}
                   {m.meta && !m.action && (
                     <div className="mt-2 pt-2 border-t border-border text-[10px] text-gray-500 flex flex-wrap gap-2">

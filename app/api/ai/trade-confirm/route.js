@@ -15,7 +15,7 @@ async function getUser(req) {
 
 async function getConfirmation(conn, token, userId) {
   const [rows] = await conn.query(
-    `SELECT token, side, symbol, quantity, quoted_price, expires_at, used_at,
+    `SELECT token, side, symbol, quantity, quoted_price, chat_message_id, expires_at, used_at,
             expires_at > UTC_TIMESTAMP() AS is_active
      FROM agent_trade_confirmations WHERE token = ? AND user_id = ? LIMIT 1`,
     [token, userId]
@@ -55,8 +55,13 @@ export async function POST(req) {
     try {
       order = await getConfirmation(conn, token, user.sub);
       if (!order || order.used_at || !order.is_active) return NextResponse.json({ error: 'This confirmation link has expired.' }, { status: 410 });
-      if (body.approve === false) {
+    if (body.approve === false) {
         await conn.query('UPDATE agent_trade_confirmations SET used_at = UTC_TIMESTAMP() WHERE token = ?', [token]);
+        if (order.chat_message_id) {
+          await conn.query(`UPDATE ai_chat_messages m JOIN ai_chat_sessions s ON s.id = m.session_id
+            SET m.action_json = NULL, m.text = CONCAT(m.text, '\n\nOrder cancelled from email confirmation.')
+            WHERE m.id = ? AND s.user_id = ?`, [order.chat_message_id, user.sub]);
+        }
         return NextResponse.json({ answer: 'Order cancelled.' });
       }
       if (body.approve !== true) return NextResponse.json({ error: 'Explicit approval is required.' }, { status: 400 });
@@ -83,6 +88,11 @@ export async function POST(req) {
     const finish = await getConnection();
     try {
       await finish.query('UPDATE agent_trade_confirmations SET used_at = UTC_TIMESTAMP() WHERE token = ?', [token]);
+      if (order.chat_message_id) {
+        await finish.query(`UPDATE ai_chat_messages m JOIN ai_chat_sessions s ON s.id = m.session_id
+          SET m.action_json = NULL, m.text = CONCAT(m.text, '\n\n✅ This paper trade was completed after email approval.')
+          WHERE m.id = ? AND s.user_id = ?`, [order.chat_message_id, user.sub]);
+      }
     } finally {
       finish.release();
     }
