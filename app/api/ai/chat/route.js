@@ -89,38 +89,10 @@ async function getSavedHistory(userId, sessionId, limit = MAX_SESSION_MESSAGES) 
       [sessionId, userId, limit]
     );
 
-    // A trade is completed only when its confirmation token also has a saved
-    // portfolio transaction. This lets an older chat card update after the
-    // user returns from approving the email.
-    let completedTrades = [];
-    try {
-      const [tradeRows] = await conn.query(
-        `SELECT c.side, c.symbol, c.quantity
-         FROM agent_trade_confirmations c
-         JOIN portfolio_transactions p ON p.user_id = c.user_id AND p.idempotency_key = c.token
-         WHERE c.user_id = ? AND c.used_at IS NOT NULL`,
-        [userId]
-      );
-      completedTrades = tradeRows || [];
-    } catch {
-      // The confirmations table does not exist until the first email order.
-    }
-
-    return rows.map((row) => {
-      const action = row.action_json ? (typeof row.action_json === 'string' ? JSON.parse(row.action_json) : row.action_json) : null;
-      const completed = action?.type === 'trade' && completedTrades.some((trade) => (
-        trade.side === action.side &&
-        trade.symbol === action.symbol &&
-        Number(trade.quantity) === Number(action.quantity)
-      ));
-      return {
-        id: String(row.id),
-        role: row.role,
-        text: completed ? `${row.text}\n\n✅ This paper trade was completed after email approval.` : row.text,
-        createdAt: row.created_at,
-        action: completed ? null : action,
-      };
-    });
+    return rows.map((row) => ({
+      id: String(row.id), role: row.role, text: row.text, createdAt: row.created_at,
+      action: row.action_json ? (typeof row.action_json === 'string' ? JSON.parse(row.action_json) : row.action_json) : null,
+    }));
   } finally {
     conn.release();
   }
