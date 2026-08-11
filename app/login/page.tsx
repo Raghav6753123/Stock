@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TrendingUp, ArrowRight, Mail, Lock, Eye, EyeOff, BarChart3, Shield, Zap } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
+import { ArrowRight, Mail, Lock, Eye, EyeOff, BarChart3, Shield, Zap } from 'lucide-react';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -61,11 +62,8 @@ export default function Login() {
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 relative">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <Link href="/" className="inline-flex items-center gap-2 mb-10 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 rounded-xl bg-[#f59e0b] flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-[#0B1426]" />
-            </div>
-            <span className="text-xl font-bold">Stonks</span>
+          <Link href="/" aria-label="Trade-karo home" className="inline-flex mb-10 hover:opacity-80 transition-opacity">
+            <BrandLogo className="h-12 w-auto max-w-[230px] rounded-lg bg-white px-2 py-1" priority />
           </Link>
 
           {/* Header */}

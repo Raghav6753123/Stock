@@ -74,6 +74,7 @@ export async function POST(req) {
         cookie: req.headers.get('cookie') || '',
         origin: internalOrigin,
         'x-idempotency-key': token,
+        'x-trade-confirmation': token,
       },
       body: JSON.stringify({ side: order.side, sym: order.symbol, name: order.symbol, quantity: Number(order.quantity), price: Number(order.quoted_price) }),
     });

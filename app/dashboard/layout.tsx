@@ -6,8 +6,9 @@ import { useRouter, usePathname } from 'next/navigation';
 import { io } from 'socket.io-client';
 import AuthRefresh from '@/components/auth-refresh';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { BrandLogo } from '@/components/brand-logo';
 import {
-  TrendingUp, Search, Bell, Settings, LogOut, Menu, Home, User,
+  Search, Bell, Settings, LogOut, Menu, Home, User,
   BarChart3, Newspaper, Wallet, Brain, Receipt, Scale,
   ArrowUpRight, ArrowDownRight, Eye,
 } from 'lucide-react';
@@ -135,11 +136,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           ${sidebarOpen ? 'w-56' : 'w-16'}`}
       >
         {/* logo */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-border ${sidebarOpen ? '' : 'justify-center'}`}>
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-            <TrendingUp className="w-4 h-4 text-primary-foreground" />
-          </div>
-          {sidebarOpen && <span className="text-lg font-bold tracking-tight">Stonks</span>}
+        <div className={`flex items-center px-3 py-4 border-b border-border ${sidebarOpen ? '' : 'justify-center'}`}>
+          <BrandLogo
+            variant={sidebarOpen ? 'wordmark' : 'mark'}
+            className={sidebarOpen ? 'h-9 w-auto max-w-[175px] rounded-md bg-white px-1.5 py-1' : 'h-9 w-9 rounded-md bg-white p-1'}
+            priority
+          />
         </div>
 
         {/* nav */}

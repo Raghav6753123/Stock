@@ -90,7 +90,6 @@ export default function PortfolioPage() {
   const [selectedSym, setSelectedSym] = useState('');
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
   const [quantity, setQuantity] = useState('');
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -215,19 +214,11 @@ export default function PortfolioPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/portfolio', {
+      const res = await fetch('/api/ai/action', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-idempotency-key': idempotencyKey
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          side,
-          sym: selectedStock.sym,
-          name: selectedStock.name,
-          sector: selectedStock.sector,
-          quantity: q,
-          price: selectedLiveQuote.price,
+          action: { type: 'trade', side, symbol: selectedStock.sym, quantity: q },
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -235,10 +226,8 @@ export default function PortfolioPage() {
         throw new Error(typeof data?.error === 'string' ? data.error : 'Trade failed');
       }
 
-      setSuccess(`${side === 'BUY' ? 'Bought' : 'Sold'} ${q} ${selectedStock.sym}`);
+      setSuccess(data.answer || `Confirmation email sent for ${side} ${q} ${selectedStock.sym}`);
       setQuantity('');
-      setIdempotencyKey(crypto.randomUUID());
-      await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Trade failed');
     } finally {

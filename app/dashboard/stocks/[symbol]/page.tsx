@@ -238,7 +238,6 @@ export default function StockDetailsPage() {
   const [tradeSubmitting, setTradeSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState('');
   const [tradeSuccess, setTradeSuccess] = useState('');
-  const [tradeIdempotencyKey, setTradeIdempotencyKey] = useState(() => crypto.randomUUID());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -440,19 +439,11 @@ export default function StockDetailsPage() {
 
     setTradeSubmitting(true);
     try {
-      const res = await fetch('/api/portfolio', {
+      const res = await fetch('/api/ai/action', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-idempotency-key': tradeIdempotencyKey
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          side: tradeSide,
-          sym: stock.sym,
-          name: stock.name,
-          sector: stock.sector,
-          quantity,
-          price: todayPrice,
+          action: { type: 'trade', side: tradeSide, symbol: stock.sym, quantity },
         }),
       });
 
@@ -461,16 +452,14 @@ export default function StockDetailsPage() {
         throw new Error(typeof json?.error === 'string' ? json.error : 'Trade failed');
       }
 
-      setTradeSuccess(`${tradeSide === 'BUY' ? 'Bought' : 'Sold'} ${quantity} ${stock.sym}`);
+      setTradeSuccess(json.answer || `Confirmation email sent for ${tradeSide} ${quantity} ${stock.sym}`);
       setTradeQty('');
-      setTradeIdempotencyKey(crypto.randomUUID());
-      await loadPortfolio();
     } catch (e) {
       setTradeError(e instanceof Error ? e.message : 'Trade failed');
     } finally {
       setTradeSubmitting(false);
     }
-  }, [stock, tradeQty, todayPrice, tradeSide, tradeIdempotencyKey, loadPortfolio]);
+  }, [stock, tradeQty, todayPrice, tradeSide]);
 
   return (
     <div className="space-y-6">

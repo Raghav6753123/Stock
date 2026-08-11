@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TrendingUp, ArrowRight, Mail, Lock, User, Eye, EyeOff, Brain, Shield, Zap, Check } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
+import { ArrowRight, Mail, Lock, User, Eye, EyeOff, Brain, Shield, Zap, Check } from 'lucide-react';
 
 export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,8 +16,8 @@ export default function SignUp() {
     password: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   // Animated stats
   const [userCount, setUserCount] = useState(12847);
@@ -56,7 +56,8 @@ export default function SignUp() {
         throw new Error(data?.error || 'Signup failed');
       }
 
-      router.push('/dashboard');
+      const data = await res.json().catch(() => ({}));
+      setSuccess(data.message || 'Check your email to verify your account, then sign in.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -126,11 +127,8 @@ export default function SignUp() {
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 relative">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <Link href="/" className="inline-flex items-center gap-2 mb-10 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 rounded-xl bg-[#f59e0b] flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-[#0B1426]" />
-            </div>
-            <span className="text-xl font-bold">Stonks</span>
+          <Link href="/" aria-label="Trade-karo home" className="inline-flex mb-10 hover:opacity-80 transition-opacity">
+            <BrandLogo className="h-12 w-auto max-w-[230px] rounded-lg bg-white px-2 py-1" priority />
           </Link>
 
           {/* Header */}
@@ -141,7 +139,14 @@ export default function SignUp() {
 
           {/* Form Card */}
           <div className="bg-[#0f1d32] border border-[#1e293b] rounded-2xl p-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
+            {success ? (
+              <div className="text-center">
+                <Mail className="mx-auto h-10 w-10 text-[#f59e0b]" />
+                <h2 className="mt-4 text-xl font-semibold">Check your email</h2>
+                <p className="mt-2 text-sm text-slate-400">{success}</p>
+                <Link href="/login" className="mt-6 inline-block text-sm font-semibold text-[#f59e0b]">Go to sign in</Link>
+              </div>
+            ) : <form onSubmit={handleSubmit} className="space-y-5">
               {/* Name Field */}
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-slate-300">
@@ -284,7 +289,7 @@ export default function SignUp() {
                   GitHub
                 </Button>
               </div>
-            </form>
+            </form>}
           </div>
 
           {/* Login Link */}

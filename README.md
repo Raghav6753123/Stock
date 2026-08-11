@@ -1,4 +1,4 @@
-# Stonks Deployment Guide (Vercel)
+# Trade-karo Deployment Guide
 
 ## 1) Prerequisites
 - A Vercel account connected to your Git provider.
@@ -31,7 +31,7 @@ Chat memory, stock context, and news context use the full 384-dimensional output
 1. Push your repository to GitHub/GitLab/Bitbucket.
 2. In Vercel: Add New Project > Import repository.
 3. Framework preset: Next.js (auto-detected).
-4. Root directory: `stonks` (if your repo root contains a nested `stonks` folder).
+4. Root directory: the folder containing this project’s `package.json`.
 5. Build command: `pnpm build` (or leave default).
 6. Install command: `pnpm install`.
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBatchQuotes, getSpark } from '../../lib/finnhub';
+import { getSharedCache, setSharedCache } from '../../lib/sharedCache';
 
 const INDEX_CONFIG = [
   { id: 'nifty', label: 'NIFTY 50', symbol: process.env.TD_SYMBOL_NIFTY || 'NIFTY', color: '#10b981', flag: '🇮🇳' },
@@ -28,6 +29,11 @@ function quoteVolume(quote) {
 
 export async function GET() {
   try {
+    const cacheKey = 'market:realtime';
+    const cached = await getSharedCache(cacheKey);
+    if (Array.isArray(cached?.indices) && Array.isArray(cached?.watchlist)) {
+      return NextResponse.json(cached, { headers: { 'X-Cache': 'HIT' } });
+    }
     const allSymbols = [...new Set([
       ...INDEX_CONFIG.map(i => i.symbol),
       ...WATCHLIST_CONFIG.map(i => i.sym)
@@ -59,10 +65,12 @@ export async function GET() {
       return isIndex ? { ...item, ...base } : { ...item, ...base, vol: quoteVolume(q) };
     };
 
-    return NextResponse.json({
+    const payload = {
       indices: INDEX_CONFIG.map(i => formatItem(i, true)),
       watchlist: WATCHLIST_CONFIG.map(i => formatItem(i, false)),
-    });
+    };
+    await setSharedCache(cacheKey, payload, 30_000);
+    return NextResponse.json(payload, { headers: { 'X-Cache': 'MISS' } });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch market data' }, { status: 500 });
   }

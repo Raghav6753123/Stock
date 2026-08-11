@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMarketNews } from '../../lib/newsApi';
 import { upsertNewsToChroma } from '../../lib/chromaMemory';
+import { getSharedCache, setSharedCache } from '../../lib/sharedCache';
 
 const FIXED_NEWS_COUNT = 50;
 
@@ -15,6 +16,11 @@ const NEWS_FALLBACK = [
 export async function GET(request) {
   // Keep a consistent fresh-50 feed for the UI.
   const count = FIXED_NEWS_COUNT;
+  const cacheKey = 'news:realtime:50';
+  const cached = await getSharedCache(cacheKey);
+  if (Array.isArray(cached?.news)) {
+    return NextResponse.json(cached, { status: 200, headers: { 'Cache-Control': 'no-store', 'X-Cache': 'HIT' } });
+  }
 
   try {
     const result = await getMarketNews({
@@ -26,19 +32,22 @@ export async function GET(request) {
 
     await upsertNewsToChroma(result.items).catch(() => {});
 
-    return NextResponse.json(
-      {
-        news: result.items,
-        meta: {
-          ...result.meta,
-          pollMs: 15 * 60_000,
-          requestedAt: new Date().toISOString(),
-        },
+    const payload = {
+      news: result.items,
+      meta: {
+        ...result.meta,
+        pollMs: 15 * 60_000,
+        requestedAt: new Date().toISOString(),
       },
+    };
+    await setSharedCache(cacheKey, payload, 5 * 60_000);
+    return NextResponse.json(
+      payload,
       {
         status: 200,
         headers: {
           'Cache-Control': 'no-store',
+          'X-Cache': 'MISS',
         },
       }
     );

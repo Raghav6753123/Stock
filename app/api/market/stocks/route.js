@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBatchQuotes, getSpark } from '../../lib/finnhub';
 import { upsertStocksToChroma } from '../../lib/chromaMemory';
+import { getSharedCache, setSharedCache } from '../../lib/sharedCache';
 
 const STOCK_POOL = [
   { sym: 'AAPL', name: 'Apple Inc.', sector: 'Technology' },
@@ -69,6 +70,11 @@ function quoteVolume(quote) {
 export async function GET(request) {
   try {
     const liveOnly = ['1', 'true', 'yes'].includes(request?.nextUrl?.searchParams?.get('liveOnly')?.toLowerCase());
+    const cacheKey = `market:stocks:${liveOnly ? 'live' : 'all'}`;
+    const cached = await getSharedCache(cacheKey);
+    if (Array.isArray(cached?.stocks)) {
+      return NextResponse.json(cached, { headers: { 'X-Cache': 'HIT' } });
+    }
     
     // We only fetch quotes for real-time symbols to avoid API exhaustion
     const symbolsToFetch = STOCK_POOL.map(s => s.sym).filter(s => REALTIME_SYMBOLS.has(s));
@@ -110,7 +116,9 @@ export async function GET(request) {
       upsertStocksToChroma(liveStocks).catch(() => {});
     }
 
-    return NextResponse.json({ stocks });
+    const payload = { stocks };
+    await setSharedCache(cacheKey, payload, 30_000);
+    return NextResponse.json(payload, { headers: { 'X-Cache': 'MISS' } });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to load stocks' }, { status: 500 });
   }

@@ -18,6 +18,7 @@ export async function getSharedCache(key) {
       headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(['GET', key]),
     });
+    if (!res.ok) return null;
     const payload = await res.json();
     return typeof payload?.result === 'string' ? JSON.parse(payload.result) : payload?.result;
   } catch {
@@ -31,12 +32,12 @@ export async function setSharedCache(key, value, ttlMs) {
 
   const ttlSeconds = Math.max(1, Math.ceil(Number(ttlMs) / 1000));
   try {
-    await fetch(config.url, {
+    const res = await fetch(config.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(['SET', key, JSON.stringify(value), 'EX', String(ttlSeconds)]),
     });
-    return true;
+    return res.ok;
   } catch {
     return false;
   }

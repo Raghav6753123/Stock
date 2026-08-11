@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getComparisonData } from '../../lib/finnhub';
+import { getSharedCache, setSharedCache } from '../../lib/sharedCache';
 
 function numberFrom(metric, keys) {
   for (const key of keys) {
@@ -37,8 +38,15 @@ export async function GET(request) {
   }
 
   try {
+    const cacheKey = `market:compare:${symbols.join(':')}`;
+    const cached = await getSharedCache(cacheKey);
+    if (Array.isArray(cached?.companies)) {
+      return NextResponse.json(cached, { headers: { 'X-Cache': 'HIT' } });
+    }
     const results = await Promise.all(symbols.map((symbol) => getComparisonData(symbol)));
-    return NextResponse.json({ companies: results.map((data, index) => formatCompany(symbols[index], data)) });
+    const payload = { companies: results.map((data, index) => formatCompany(symbols[index], data)) };
+    await setSharedCache(cacheKey, payload, 5 * 60_000);
+    return NextResponse.json(payload, { headers: { 'X-Cache': 'MISS' } });
   } catch (error) {
     console.error('Stock comparison failed:', error);
     return NextResponse.json({ error: 'Unable to load comparison data. Check your Finnhub API key and symbols.' }, { status: 502 });

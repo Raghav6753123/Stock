@@ -6,12 +6,12 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, KeepTogether
 
-OUT = Path('output/pdf/stonks_conceptual_interview_guide.pdf')
+OUT = Path('output/pdf/trade_karo_conceptual_interview_guide.pdf')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 S = [
 ('1. Project Overview and Architecture', [
-('What problem does Stonks solve?', 'Stonks is a stock-dashboard and portfolio-simulation application. It helps users view market data, track virtual holdings and cash, receive AI-assisted insights, read news, and explore ML-based predictions in one place.'),
+('What problem does Trade-karo solve?', 'Trade-karo is a stock-dashboard and portfolio-simulation application. It helps users view market data, track virtual holdings and cash, receive AI-assisted insights, read news, and explore ML-based predictions in one place.'),
 ('Explain the project in one minute to an interviewer.', 'The frontend is built with Next.js and React. Next.js route handlers provide APIs for authentication, market data, portfolios, news, and AI chat. MySQL stores users and portfolio data; a FastAPI service handles Python ML models; Chroma supports semantic retrieval for the AI chatbot.'),
 ('Why did you use Next.js?', 'It lets us build the UI and backend-for-frontend in the same project. It supports React-based pages, server APIs, routing, and production deployment without managing a separate Node backend at the beginning.'),
 ('What are the main modules of the project?', 'The main modules are authentication, dashboard, market/stocks, portfolio and wallet, transactions, news, AI chat, buy-signal prediction, end-of-day prediction, and portfolio rating.'),
@@ -47,7 +47,7 @@ S = [
 ('How would you make login more secure later?', 'Add rate limiting, password rules, email verification, MFA, device/session management, audit logs, and immediate token revocation for suspicious activity.'),
 ]),
 ('4. Database, Wallet and Portfolio', [
-('What does MySQL store in Stonks?', 'It stores durable user information, password/refresh-token data, wallet balances, portfolio holdings, and transaction history.'),
+('What does MySQL store in Trade-karo?', 'It stores durable user information, password/refresh-token data, wallet balances, portfolio holdings, and transaction history.'),
 ('What is the difference between wallet, holdings, and transactions?', 'Wallet is unused virtual cash. Holdings are current positions such as quantity and average price. Transactions are the historical BUY and SELL records that explain how the portfolio changed.'),
 ('Explain a BUY transaction flow.', 'The API authenticates the user, validates symbol, quantity, and price, checks the wallet balance, subtracts the trade cost, creates or updates the holding, records the transaction, and commits all changes together.'),
 ('Explain a SELL transaction flow.', 'The API confirms the user owns enough quantity, reduces or removes the holding, adds sale value to wallet cash, calculates realized P&L using average cost, records the sale, and commits it.'),
@@ -128,13 +128,13 @@ S = [
 ('What AI improvement would you make first?', 'Add user-scoped retrieval filters and answer citations. That improves privacy, traceability, and user trust before adding more model complexity.'),
 ('What database improvement would you make first?', 'Replace request-time schema setup with versioned migrations and confirm the most important unique/index constraints. This makes deployments predictable and protects data integrity.'),
 ('How would you answer “what did you learn?”', 'I learned that building AI and ML features is not only about models; reliable product behavior needs security, clean data flow, database correctness, provider failure handling, clear UX, and honest communication of uncertainty.'),
-('How would you close a project interview discussion?', 'I would explain that Stonks demonstrates a full-stack approach to a financial-learning product, while being clear about its current boundaries and the practical next steps needed for production-grade scale and financial safety.'),
+('How would you close a project interview discussion?', 'I would explain that Trade-karo demonstrates a full-stack approach to a financial-learning product, while being clear about its current boundaries and the practical next steps needed for production-grade scale and financial safety.'),
 ])]
 
 def footer(canvas, doc):
     canvas.saveState(); canvas.setStrokeColor(colors.HexColor('#1D4ED8')); canvas.line(18*mm,15*mm,192*mm,15*mm)
     canvas.setFont('Helvetica',8); canvas.setFillColor(colors.HexColor('#64748B'))
-    canvas.drawString(18*mm,9*mm,'Stonks - Conceptual Interview Guide'); canvas.drawRightString(192*mm,9*mm,f'Page {doc.page}'); canvas.restoreState()
+    canvas.drawString(18*mm,9*mm,'Trade-karo - Conceptual Interview Guide'); canvas.drawRightString(192*mm,9*mm,f'Page {doc.page}'); canvas.restoreState()
 
 styles = getSampleStyleSheet()
 title = ParagraphStyle('title', parent=styles['Title'], fontName='Helvetica-Bold', fontSize=24, leading=29, alignment=TA_CENTER, textColor=colors.HexColor('#0F172A'))
@@ -144,7 +144,7 @@ qst = ParagraphStyle('qst', parent=styles['BodyText'], fontName='Helvetica-Bold'
 ans = ParagraphStyle('ans', parent=styles['BodyText'], fontSize=9.2, leading=12.5, textColor=colors.HexColor('#334155'), leftIndent=4*mm, spaceAfter=8)
 note = ParagraphStyle('note', parent=styles['BodyText'], fontSize=10, leading=15, alignment=TA_CENTER, textColor=colors.HexColor('#334155'))
 
-story = [Spacer(1,37*mm), Paragraph('Stonks', title), Paragraph('Conceptual Interview Guide', title), Spacer(1,6*mm), Paragraph('100 practical questions and interview-ready answers', sub), Spacer(1,16*mm), Paragraph('Designed for explaining the project clearly: how it works, why each technology is used, and how you would respond to common product and technical scenarios.', note), PageBreak()]
+story = [Spacer(1,37*mm), Paragraph('Trade-karo', title), Paragraph('Conceptual Interview Guide', title), Spacer(1,6*mm), Paragraph('100 practical questions and interview-ready answers', sub), Spacer(1,16*mm), Paragraph('Designed for explaining the project clearly: how it works, why each technology is used, and how you would respond to common product and technical scenarios.', note), PageBreak()]
 n=0
 for name, rows in S:
     story.append(Paragraph(name,sec))
@@ -152,6 +152,6 @@ for name, rows in S:
         n += 1
         story.append(KeepTogether([Paragraph(f'{n}. {q}',qst), Paragraph(f'<b>Answer:</b> {a}',ans)]))
 
-doc=SimpleDocTemplate(str(OUT), pagesize=A4, leftMargin=18*mm,rightMargin=18*mm,topMargin=19*mm,bottomMargin=20*mm,title='Stonks Conceptual Interview Guide',author='Codex')
+doc=SimpleDocTemplate(str(OUT), pagesize=A4, leftMargin=18*mm,rightMargin=18*mm,topMargin=19*mm,bottomMargin=20*mm,title='Trade-karo Conceptual Interview Guide',author='Codex')
 doc.build(story,onFirstPage=footer,onLaterPages=footer)
 print(OUT.resolve(), 'questions=',n)
