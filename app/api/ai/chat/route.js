@@ -598,15 +598,9 @@ export async function POST(req) {
     const origin = req.nextUrl.origin;
     const stocks = await fetchStocksFromApi(origin);
     const news = await fetchNewsFromApi(origin);
-    if (!stocks.length) {
-      return NextResponse.json(
-        {
-          error: 'No stocks available from market API right now. Please try again shortly.',
-          code: 'NO_STOCKS',
-        },
-        { status: 503 }
-      );
-    }
+
+    // The chat can still answer and the trade tool gets its own live quote.
+    // Do not reject the whole prompt just because the dashboard feed is slow.
     await upsertStocksToChroma(stocks);
     if (news.length > 0) {
       await upsertNewsToChroma(news).catch(() => {});
