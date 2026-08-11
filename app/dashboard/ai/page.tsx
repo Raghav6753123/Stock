@@ -226,7 +226,7 @@ export default function AiChatPage() {
       }
 
       const assistantMsg: ChatMessage = {
-        id: makeId(),
+        id: String(data?.messageId || makeId()),
         role: 'assistant',
         text: String(data?.answer || 'No response generated.'),
         createdAt: new Date().toISOString(),

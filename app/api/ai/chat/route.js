@@ -112,11 +112,12 @@ async function saveChatTurn(userId, sessionId, prompt, answer, action = null) {
       }
       await conn.query('INSERT INTO ai_chat_sessions (id, user_id) VALUES (?, ?)', [sessionId, userId]);
     }
-    await conn.query(
+    const [result] = await conn.query(
       'INSERT INTO ai_chat_messages (session_id, role, text, action_json) VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
       [sessionId, 'user', prompt, null, sessionId, 'assistant', answer, action ? JSON.stringify(action) : null]
     );
     await conn.query('UPDATE ai_chat_sessions SET updated_at = UTC_TIMESTAMP() WHERE id = ?', [sessionId]);
+    return String(Number(result.insertId) + 1);
   } finally {
     conn.release();
   }
@@ -617,29 +618,32 @@ export async function POST(req) {
       }
       const total = Number(quote.price) * agentResult.action.quantity;
       const answer = `I prepared a ${agentResult.action.side} order for ${agentResult.action.quantity} ${agentResult.action.symbol} at the current price of $${Number(quote.price).toFixed(2)}. Estimated value: $${total.toFixed(2)}. Please confirm before I place this paper trade.`;
-      await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
+      const messageId = await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
       return NextResponse.json({
         answer,
         action: agentResult.action,
+        messageId,
       });
     }
 
     if (agentResult?.action?.type === 'alert') {
       const answer = `I prepared an alert for ${agentResult.action.symbol} ${agentResult.action.direction} $${agentResult.action.targetPrice.toFixed(2)}. Please confirm before I create it.`;
-      await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
+      const messageId = await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
       return NextResponse.json({
         answer,
         action: agentResult.action,
+        messageId,
       });
     }
 
     if (agentResult?.action?.type === 'observation') {
       const hours = agentResult.action.hours;
       const answer = `I prepared an observation for ${agentResult.action.symbol} for ${hours} hour${hours === 1 ? '' : 's'}. Please confirm before I start tracking it.`;
-      await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
+      const messageId = await saveChatTurn(userId, sessionId, prompt, answer, agentResult.action);
       return NextResponse.json({
         answer,
         action: agentResult.action,
+        messageId,
       });
     }
 
@@ -742,12 +746,13 @@ export async function POST(req) {
       throw chatError;
     }
 
-    await saveChatTurn(userId, sessionId, prompt, answer);
+    const messageId = await saveChatTurn(userId, sessionId, prompt, answer);
     storeChatTurn({ sessionId, prompt, answer }).catch(() => {});
 
     return NextResponse.json(
       {
         answer,
+        messageId,
         meta: {
           stocksIndexed: stocks.length,
           newsIndexed: news.length,

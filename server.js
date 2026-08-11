@@ -19,6 +19,18 @@ async function runObservationMonitor() {
   }
 }
 
+async function runAlertMonitor() {
+  const secret = process.env.ALERT_MONITOR_SECRET;
+  if (!secret) return;
+  try {
+    await fetch(`http://127.0.0.1:${port}/api/alerts/monitor`, {
+      headers: { 'x-alert-monitor-secret': secret },
+    });
+  } catch {
+    // The next scheduled check will retry failed provider connections.
+  }
+}
+
 app.prepare().then(() => {
   const server = http.createServer(handle);
   const io = new Server(server);
@@ -46,6 +58,8 @@ app.prepare().then(() => {
   server.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
     runObservationMonitor();
+    runAlertMonitor();
   });
   setInterval(runObservationMonitor, 15 * 60 * 1000);
+  setInterval(runAlertMonitor, 60 * 1000);
 });
