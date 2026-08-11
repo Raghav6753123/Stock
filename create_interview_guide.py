@@ -6,7 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, KeepTogether
 
-OUT = Path('output/pdf/trade_karo_interview_guide.pdf')
+OUT = Path('output/pdf/stonks_interview_guide.pdf')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 sections = [
@@ -132,7 +132,7 @@ def header(canvas, doc):
     canvas.line(18*mm, 15*mm, 192*mm, 15*mm)
     canvas.setFont('Helvetica', 8)
     canvas.setFillColor(colors.HexColor('#475569'))
-    canvas.drawString(18*mm, 9*mm, 'Trade-karo Interview Study Guide')
+    canvas.drawString(18*mm, 9*mm, 'Stonks Interview Study Guide')
     canvas.drawRightString(192*mm, 9*mm, f'Page {doc.page}')
     canvas.restoreState()
 
@@ -144,7 +144,7 @@ question = ParagraphStyle('Question', parent=styles['BodyText'], fontName='Helve
 answer = ParagraphStyle('Answer', parent=styles['BodyText'], fontSize=9.2, leading=13, textColor=colors.HexColor('#334155'), leftIndent=4*mm, spaceAfter=9)
 intro = ParagraphStyle('Intro', parent=styles['BodyText'], fontSize=10, leading=15, textColor=colors.HexColor('#334155'), alignment=TA_CENTER)
 
-story = [Spacer(1, 38*mm), Paragraph('Trade-karo', title), Paragraph('Interview Study Guide', title), Spacer(1, 4*mm), Paragraph('100 difficult, project-specific questions with concise interview-ready answers', subtitle), Spacer(1, 18*mm), Paragraph('Prepared from the current Trade-karo codebase: Next.js, MySQL, JWT authentication, market-data integrations, FastAPI ML services, and Chroma-powered AI chat.', intro), PageBreak()]
+story = [Spacer(1, 38*mm), Paragraph('Stonks', title), Paragraph('Interview Study Guide', title), Spacer(1, 4*mm), Paragraph('100 difficult, project-specific questions with concise interview-ready answers', subtitle), Spacer(1, 18*mm), Paragraph('Prepared from the current Stonks codebase: Next.js, MySQL, JWT authentication, market-data integrations, FastAPI ML services, and Chroma-powered AI chat.', intro), PageBreak()]
 
 n = 0
 for sec, items in sections:
@@ -154,6 +154,6 @@ for sec, items in sections:
         block = [Paragraph(f'{n}. {q}', question), Paragraph(f'<b>Answer:</b> {a}', answer)]
         story.append(KeepTogether(block))
 
-doc = SimpleDocTemplate(str(OUT), pagesize=A4, rightMargin=18*mm, leftMargin=18*mm, topMargin=19*mm, bottomMargin=20*mm, title='Trade-karo Interview Study Guide', author='Codex')
+doc = SimpleDocTemplate(str(OUT), pagesize=A4, rightMargin=18*mm, leftMargin=18*mm, topMargin=19*mm, bottomMargin=20*mm, title='Stonks Interview Study Guide', author='Codex')
 doc.build(story, onFirstPage=header, onLaterPages=header)
 print(OUT.resolve())

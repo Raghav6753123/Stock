@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import getConnection from '../lib/mysql';
-import sgMail from '@sendgrid/mail';
-import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns, ensureEmailVerifiedColumn } from '../lib/userSchema';
+import { buildAuthCookies } from '../lib/authCookies';
+import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
+import jwtUtil from '../lib/jwt';
 import { isTrustedOrigin } from '../lib/requestSecurity';
 
 export async function POST(req) {
@@ -40,11 +41,6 @@ export async function POST(req) {
       if (!refreshSchema.ok) {
         return NextResponse.json({ error: refreshSchema.error }, { status: 500 });
       }
-      const verifiedSchema = await ensureEmailVerifiedColumn(conn);
-      if (!verifiedSchema.ok) return NextResponse.json({ error: verifiedSchema.error }, { status: 500 });
-      if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_FROM_EMAIL) {
-        return NextResponse.json({ error: 'Email verification is not configured.' }, { status: 500 });
-      }
 
       const [rows] = await conn.query(
         'SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1',
@@ -72,26 +68,25 @@ export async function POST(req) {
         return NextResponse.json({ error: 'User creation failed' }, { status: 500 });
       }
 
-      await conn.query(`CREATE TABLE IF NOT EXISTS email_verifications (
-        token CHAR(36) NOT NULL PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL,
-        expires_at DATETIME NOT NULL, used_at DATETIME NULL,
-        CONSTRAINT fk_email_verification_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-      const token = crypto.randomUUID();
+      const refreshTokenId = jwtUtil.createRefreshTokenId();
+      const accessToken = await jwtUtil.signAccessToken({ sub: user.id, email: user.email, name: user.name });
+      const refreshToken = await jwtUtil.signRefreshToken({ sub: user.id, jti: refreshTokenId }, jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT);
+      const refreshTokenHash = jwtUtil.hashToken(refreshToken);
+
       await conn.query(
-        'INSERT INTO email_verifications (token, user_id, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 24 HOUR))',
-        [token, user.id]
+        'UPDATE users SET refresh_token_hash = ?, refresh_token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND) WHERE id = ?',
+        [refreshTokenHash, jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT, user.id]
       );
-      const link = `${process.env.APP_URL || req.nextUrl.origin}/auth/verify-email?token=${encodeURIComponent(token)}`;
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-      await sgMail.send({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL,
-        subject: 'Verify your Trade-karo account email',
-        text: `Verify your account within 24 hours: ${link}`,
-        html: `<p>Welcome to Trade-karo.</p><p><a href="${link}">Verify your email address</a></p><p>This link expires in 24 hours.</p>`,
+      const cookies = buildAuthCookies({
+        accessToken,
+        refreshToken,
+        refreshMaxAgeSeconds: jwtUtil.REFRESH_TOKEN_TTL_SECONDS_DEFAULT,
       });
-      return NextResponse.json({ message: 'Verification email sent. Open it before signing in.' }, { status: 201 });
+
+      const res = NextResponse.json({ user }, { status: 201 });
+      res.cookies.set(cookies.access);
+      res.cookies.set(cookies.refresh);
+      return res;
     } finally {
       conn.release();
     }

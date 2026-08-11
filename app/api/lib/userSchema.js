@@ -33,7 +33,6 @@ export async function ensureUsersTable(conn) {
         password_hash VARCHAR(255) NULL,
         refresh_token_hash VARCHAR(64) NULL,
         refresh_token_expires_at DATETIME NULL,
-        email_verified_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -50,20 +49,6 @@ export async function ensureUsersTable(conn) {
         "Failed to auto-migrate DB to create users table. Run the SQL manually. Underlying error: " +
         message,
     };
-  }
-}
-
-export async function ensureEmailVerifiedColumn(conn) {
-  const [columns] = await conn.query("SHOW COLUMNS FROM users LIKE 'email_verified_at'");
-  if (columns.length) return { ok: true };
-  if (!autoMigrateEnabled()) return { ok: false, error: "Database schema missing users.email_verified_at. Set AUTO_MIGRATE_AUTH=1 once to add it." };
-  try {
-    await conn.query('ALTER TABLE users ADD COLUMN email_verified_at DATETIME NULL');
-    // Accounts created before verification was introduced have already been in use.
-    await conn.query('UPDATE users SET email_verified_at = UTC_TIMESTAMP() WHERE email_verified_at IS NULL');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Could not add email verification column.' };
   }
 }
 

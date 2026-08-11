@@ -171,38 +171,12 @@ export async function POST(req) {
     }
 
     const idempotencyKey = req.headers.get('x-idempotency-key') || null;
-    const confirmationToken = req.headers.get('x-trade-confirmation') || null;
-
-    if (!confirmationToken || confirmationToken !== idempotencyKey) {
-      return NextResponse.json(
-        { error: 'Approve this trade from the confirmation email before it can be executed.' },
-        { status: 403 }
-      );
-    }
 
     const conn = await getConnection();
     try {
       const schema = await ensurePortfolioSchema(conn);
       if (!schema.ok) {
         return NextResponse.json({ error: schema.error }, { status: 500 });
-      }
-
-      const [authorizationRows] = await conn.query(
-        `SELECT c.token
-         FROM agent_trade_confirmations c
-         JOIN users u ON u.id = c.user_id
-         WHERE c.token = ? AND c.user_id = ? AND c.side = ? AND c.symbol = ?
-           AND c.quantity = ? AND c.quoted_price = ?
-           AND c.used_at IS NULL AND c.expires_at > UTC_TIMESTAMP()
-           AND u.email_verified_at IS NOT NULL
-         LIMIT 1`,
-        [confirmationToken, userId, side, sym, quantity, price]
-      );
-      if (!authorizationRows?.length) {
-        return NextResponse.json(
-          { error: 'This email approval is invalid, expired, or does not match the trade.' },
-          { status: 403 }
-        );
       }
 
       await ensureWalletRow(conn, userId);

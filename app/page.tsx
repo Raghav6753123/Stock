@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { ArrowRight, TrendingUp, Brain, BarChart3, MessageSquare, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { BrandLogo } from '@/components/brand-logo';
 import { useState, useEffect } from 'react';
 import NumberFlow from '@number-flow/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -200,7 +199,12 @@ export default function Home() {
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <BrandLogo className="h-10 w-auto max-w-[205px] rounded-md bg-white px-2 py-1" priority />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold">Stonks</span>
+          </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm hover:text-primary transition-colors">Features</a>
             <a href="#how-it-works" className="text-sm hover:text-primary transition-colors">How it Works</a>
@@ -473,7 +477,7 @@ export default function Home() {
                       <div className="w-3 h-3 rounded-full bg-yellow-500" />
                       <div className="w-3 h-3 rounded-full bg-green-500" />
                     </div>
-                    <div className="text-xs text-gray-500">trade-karo.com/dashboard</div>
+                    <div className="text-xs text-gray-500">stonks.ai/dashboard</div>
                   </div>
                   
                   {/* Mini Chart */}
@@ -1109,13 +1113,18 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
             {/* Brand */}
             <div className="lg:col-span-2">
-              <BrandLogo className="h-11 w-auto max-w-[220px] rounded-md bg-white px-2 py-1 mb-4" />
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-full bg-[#10b981] flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-lg font-semibold text-white">Stonks</span>
+              </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 AI-powered market intelligence for modern investors. Track trends, uncover signals, and make confident decisions with real-time insights.
               </p>
               <div className="space-y-2 text-sm text-gray-400">
                 <p>HQ: 245 Market Ave, San Francisco, CA</p>
-                <p>Support: support@trade-karo.com</p>
+                <p>Support: support@stonks.ai</p>
                 <p>Phone: (415) 555-0199</p>
               </div>
             </div>
@@ -1155,7 +1164,7 @@ export default function Home() {
           </div>
 
           <div className="mt-12 pt-8 border-t border-[#1e293b] flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-500">© 2026 Trade-karo. All rights reserved.</p>
+            <p className="text-xs text-gray-500">© 2026 Stonks, Inc. All rights reserved.</p>
             <div className="flex items-center gap-4 text-xs text-gray-500">
               <span>FINRA #STK-4821</span>
               <span>SEC Registered</span>

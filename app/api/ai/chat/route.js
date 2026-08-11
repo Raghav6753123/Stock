@@ -335,7 +335,7 @@ function getAiChain() {
     });
 
     const prompt = ChatPromptTemplate.fromTemplate(`
-You are the Trade-karo AI assistant for a stock dashboard.
+You are Stonks AI assistant for a stock dashboard.
 Use only the provided database context for stock data; if data is missing, say so clearly.
 Keep answers concise and actionable.
 IMPORTANT: Format your response using clean, readable bullet points. DO NOT use markdown tables under any circumstances. Use **bold** text for emphasis and stock tickers.
@@ -383,7 +383,7 @@ async function callAgent({ userPrompt, stockDocs, newsDocs, chatDocs }) {
   const chatContext = chatDocs.length ? chatDocs.map((item) => item.document).join('\n\n') : 'No prior chat memory.';
   const model = await getAgentModel();
   const result = await withTimeout(
-    model.invoke(`You are Trade-karo AI, a concise stock research assistant.
+    model.invoke(`You are Stonks AI, a concise stock research assistant.
 Always select exactly one tool. For a general question or a request with missing details, use reply_to_user.
 For an explicit buy or sell request with a stock, quantity, and side, always use prepare_trade.
 For an explicit price alert with a stock, direction, and price, always use create_price_alert.

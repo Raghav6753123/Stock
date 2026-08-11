@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import getConnection from '../lib/mysql';
 import { buildAuthCookies } from '../lib/authCookies';
-import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns, ensureEmailVerifiedColumn } from '../lib/userSchema';
+import { ensureUsersTable, ensurePasswordHashColumn, ensureRefreshTokenColumns } from '../lib/userSchema';
 import jwtUtil from '../lib/jwt';
 import { clearLoginFailures, isLoginRateLimited, isTrustedOrigin, recordLoginFailure } from '../lib/requestSecurity';
 
@@ -41,11 +41,9 @@ export async function POST(req) {
             if (!refreshSchema.ok) {
                 return NextResponse.json({ error: refreshSchema.error }, { status: 500 });
             }
-            const verifiedSchema = await ensureEmailVerifiedColumn(conn);
-            if (!verifiedSchema.ok) return NextResponse.json({ error: verifiedSchema.error }, { status: 500 });
 
             const [rows] = await conn.query(
-                'SELECT id, name, email, password_hash, email_verified_at FROM users WHERE email = ? LIMIT 1',
+                'SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1',
                 [email]
             );
 
@@ -73,9 +71,6 @@ export async function POST(req) {
                     { error: 'Invalid email or password' },
                     { status: 401 }
                 );
-            }
-            if (!user.email_verified_at) {
-                return NextResponse.json({ error: 'Verify your email address before signing in.' }, { status: 403 });
             }
 
             const refreshTtl = rememberMe

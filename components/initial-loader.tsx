@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BrandLogo } from '@/components/brand-logo';
 
 export default function InitialLoader() {
   const [visible, setVisible] = useState(true);
@@ -36,7 +35,26 @@ export default function InitialLoader() {
     >
       <div className="flex flex-col items-center gap-10">
         {/* Logo + Name */}
-        <BrandLogo className="h-14 w-auto max-w-[280px] rounded-lg bg-white px-2 py-1" priority />
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+            <svg
+              className="w-6 h-6 text-primary-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
+            </svg>
+          </div>
+          <span className="text-2xl font-black tracking-tight text-foreground">
+            Stonks
+          </span>
+        </div>
 
         {/* Pulse ring spinner */}
         <div className="relative w-16 h-16">

@@ -71,10 +71,9 @@ export async function POST(req) {
       let email;
       try {
         await ensureConfirmationsTable(conn);
-        const [users] = await conn.query('SELECT email, email_verified_at FROM users WHERE id = ? LIMIT 1', [user.sub]);
+        const [users] = await conn.query('SELECT email FROM users WHERE id = ? LIMIT 1', [user.sub]);
         email = users?.[0]?.email;
         if (!email) throw new Error('Account email not found');
-        if (!users[0].email_verified_at) throw new Error('Verify your account email before placing a trade');
         await conn.query(
           'INSERT INTO agent_trade_confirmations (token, user_id, side, symbol, quantity, quoted_price, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE))',
           [token, user.sub, side, symbol, quantity, price]

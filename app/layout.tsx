@@ -1,29 +1,33 @@
 import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import InitialLoader from '@/components/initial-loader'
 import './globals.css'
 
+const _geist = Geist({ subsets: ["latin"] });
+const _geistMono = Geist_Mono({ subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: 'Trade-karo — AI-Powered Stock Dashboard',
+  title: 'Stonks — AI-Powered Stock Dashboard',
   description: 'Real-time stock analysis and portfolio management',
   generator: 'v0.app',
   icons: {
     icon: [
       {
-        url: '/trade-karo-mark.png',
+        url: '/icon-light-32x32.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/trade-karo-mark.png',
+        url: '/icon-dark-32x32.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/trade-karo-mark.png',
-        type: 'image/png',
+        url: '/icon.svg',
+        type: 'image/svg+xml',
       },
     ],
-    apple: '/trade-karo-mark.png',
+    apple: '/apple-icon.png',
   },
 }
 

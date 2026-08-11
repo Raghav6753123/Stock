@@ -6,7 +6,7 @@ This project now supports a local fine-tuned chatbot model (LoRA adapter) as an 
 
 ### 1. Model Files
 Place your fine-tuned LoRA adapter files in the following directory:
-`Trade-karo/models/chatbot/stock-chat-qwen3-lora-final/`
+`Stonks/models/chatbot/stock-chat-qwen3-lora-final/`
 
 Required files:
 - `adapter_config.json`
