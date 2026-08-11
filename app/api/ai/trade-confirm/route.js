@@ -64,9 +64,17 @@ export async function POST(req) {
       conn.release();
     }
 
-    const response = await fetch(`${req.nextUrl.origin}/api/portfolio`, {
+    // Calling the public Railway URL from this same server can fail behind the
+    // proxy. The local server is the same authenticated application.
+    const internalOrigin = `http://127.0.0.1:${process.env.PORT || 3000}`;
+    const response = await fetch(`${internalOrigin}/api/portfolio`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') || '', origin: req.nextUrl.origin, 'x-idempotency-key': token },
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: req.headers.get('cookie') || '',
+        origin: internalOrigin,
+        'x-idempotency-key': token,
+      },
       body: JSON.stringify({ side: order.side, sym: order.symbol, name: order.symbol, quantity: Number(order.quantity), price: Number(order.quoted_price) }),
     });
     const data = await response.json().catch(() => ({}));
@@ -79,7 +87,8 @@ export async function POST(req) {
       finish.release();
     }
     return NextResponse.json({ answer: `${order.side === 'BUY' ? 'Bought' : 'Sold'} ${order.quantity} ${order.symbol} at $${Number(order.quoted_price).toFixed(2)}.` });
-  } catch {
+  } catch (error) {
+    console.error('Trade confirmation failed:', error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Unable to complete this order.' }, { status: 500 });
   }
 }
